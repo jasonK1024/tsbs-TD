@@ -4,10 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	influxdb_client "github.com/taosdata/tsbs/InfluxDB-client/v2"
+	"github.com/taosdata/tsbs/TDengine_Client/tdengine_client"
 	"io/ioutil"
 	"log"
 	"os"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +41,9 @@ type BenchmarkRunnerConfig struct {
 	PrintInterval    uint64 `mapstructure:"print-interval"`
 	PrewarmQueries   bool   `mapstructure:"prewarm-queries"`
 	ResultsFile      string `mapstructure:"results-file"`
+
+	CacheURL string `mapstructure:"cache-url"`
+	UseCache string `mapstructure:"use-cache"`
 }
 
 // AddToFlagSet adds command line flags needed by the BenchmarkRunnerConfig to the flag set.
@@ -55,6 +61,10 @@ func (c BenchmarkRunnerConfig) AddToFlagSet(fs *pflag.FlagSet) {
 	fs.Int("debug", 0, "Whether to print debug messages.")
 	fs.String("file", "", "File name to read queries from")
 	fs.String("results-file", "", "Write the test results summary json to this file")
+
+	fs.String("cache-url", "http://localhost:11211", "STsCache url")
+	fs.String("use-cache", "db", "use STsCache , tscache ,default use database")
+
 }
 
 // BenchmarkRunner contains the common components for running a query benchmarking
@@ -78,6 +88,24 @@ func NewBenchmarkRunner(config BenchmarkRunnerConfig) *BenchmarkRunner {
 		prewarmQueries:   runner.PrewarmQueries,
 		burnIn:           runner.BurnIn,
 		hdrLatenciesFile: runner.HDRLatenciesFile,
+	}
+
+	// todo cache启动参数
+	if strings.EqualFold(tdengine_client.DbName, "tdengine") {
+		tdengine_client.DB = config.DBName
+
+		tdengine_client.UseCache = config.UseCache
+		tdengine_client.STsCacheURL = config.CacheURL
+		STsCacheURLArr := strings.Split(tdengine_client.STsCacheURL, ",")
+		tdengine_client.STsConnArr = tdengine_client.InitStsConnsArr(STsCacheURLArr)
+	} else {
+		// todo cache启动参数
+		influxdb_client.DB = config.DBName
+
+		influxdb_client.UseCache = config.UseCache
+		influxdb_client.STsCacheURL = config.CacheURL
+		STsCacheURLArr := strings.Split(influxdb_client.STsCacheURL, ",")
+		influxdb_client.STsConnArr = influxdb_client.InitStsConnsArr(STsCacheURLArr)
 	}
 
 	runner.sp = newStatProcessor(spArgs)

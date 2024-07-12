@@ -94,7 +94,7 @@ sudo apt-get update
 
 Install binaries 
 ```bash
-sudo apt-get install -y clickhouse-client clickhouse-server
+sudo apt-get install -y clickhouse-tdengine_client clickhouse-server
 ```
 More details on how to get started with ClickHouse is available [here](https://clickhouse.yandex/docs/en/getting_started/)
 

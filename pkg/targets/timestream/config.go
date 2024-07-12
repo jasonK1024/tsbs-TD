@@ -26,7 +26,7 @@ func targetSpecificFlags(flagPrefix string, flagSet *pflag.FlagSet) {
 	flagSet.Bool(
 		flagPrefix+"use-common-attributes",
 		true,
-		"Timestream client makes write requests with common attributes. "+
+		"Timestream tdengine_client makes write requests with common attributes. "+
 			"If false, each value is written as a separate Record and a request of 100 records at once is sent")
 	flagSet.String(flagPrefix+"aws-region", "us-east-1", "AWS region where the db is located")
 	flagSet.String(

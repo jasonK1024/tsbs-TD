@@ -42,7 +42,7 @@ func TestNewCassandra(t *testing.T) {
 	q.HumanDescription = []byte("bar")
 	q.MeasurementName = []byte("baz")
 	q.FieldName = []byte("quaz")
-	q.AggregationType = []byte("client")
+	q.AggregationType = []byte("tdengine_client")
 	q.GroupByDuration = time.Second
 	q.ForEveryN = []byte("5m")
 	q.WhereClause = []byte("TRUE > FALSE")

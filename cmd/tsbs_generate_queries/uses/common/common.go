@@ -2,8 +2,10 @@ package common
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/taosdata/tsbs/cmd/tsbs_generate_queries/utils"
@@ -63,4 +65,82 @@ func GetRandomSubsetPerm(numItems int, totalItems int) ([]int, error) {
 		}
 	}
 	return res, nil
+}
+
+var TruckScale string
+
+func GetContinuousRandomSubset() ([]int, error) {
+	// 要取的结果数量
+	//resNum := (rand.Intn(4) + 1) * 10 // 生成 [0,4) 的一个整数｛0,1,2,3｝，加一变成 ｛1,2,3,4｝，乘十变成｛10,20,30，40｝
+
+	resNum := 0
+	if strings.EqualFold(TruckScale, "small") {
+		resNum = 10
+	} else if strings.EqualFold(TruckScale, "medium") {
+		resNum = 30
+	} else if strings.EqualFold(TruckScale, "large") {
+		resNum = 50
+	} else {
+		log.Fatal("wrong TruckScale, should be big/medium/large\n")
+	}
+
+	// 结果数组
+	result := make([]int, resNum)
+
+	// 随机取某区间内的该数量的整数
+	switch resNum {
+	case 10:
+		//section := rand.Intn(10) * 10 // 生成[0,10) 的一个整数，乘 10 变成{0,10,20....90}
+		section := rand.Intn(19) * 5 * 1 // 生成[0,20) 的一个整数，乘 5 变成{0,5,15....90}
+		fmt.Printf("result number: %d\tsection number: %d\n", resNum, section)
+		for i := 0; i < resNum; i++ {
+			result[i] = section
+			section++
+		}
+		break
+	//case 20:
+	//	section := rand.Intn(5) * 20 // 生成[0,5) 的一个整数{0,1,2,3,4}，乘二十变成{0,20,40,60，80}
+	//	fmt.Printf("result number: %d\tsection number: %d\n", resNum, section)
+	//	for i := 0; i < resNum; i++ {
+	//		result[i] = section
+	//		section++
+	//	}
+	//	break
+	// todo
+	case 30:
+		section := rand.Intn(19) * 5 * 3 // 生成[0,20) 的一个整数｛0,1,2｝，乘五变成{0,5,10}，乘三变成{0,15,30}
+		fmt.Printf("result number: %d\tsection number: %d\n", resNum, section)
+		for i := 0; i < resNum; i++ {
+			result[i] = section
+			section++
+		}
+		break
+	//case 40:
+	//	section := rand.Intn(2) * 40 // 生成[0,2) 的一个整数{0,1}，乘十变成{0,40}
+	//	fmt.Printf("result number: %d\tsection number: %d\n", resNum, section)
+	//	for i := 0; i < resNum; i++ {
+	//		result[i] = section
+	//		section++
+	//	}
+	//	break
+	case 50:
+		section := rand.Intn(19) * 5 * 5 // 生成[0,20) 的一个整数｛0,1,2｝，乘五变成{0,5,10}，乘五变成{0,25,50}
+		fmt.Printf("result number: %d\tsection number: %d\n", resNum, section)
+		for i := 0; i < resNum; i++ {
+			result[i] = section
+			section++
+		}
+		break
+	default:
+		// todo 生成 50 个
+		section := rand.Intn(19) * 5 * 1 // 生成[0,20) 的一个整数，乘 25 变成{0,25,50....450}
+		fmt.Printf("result number: %d\tsection number: %d\n", resNum, section)
+		for i := 0; i < resNum; i++ {
+			result[i] = section
+			section++
+		}
+		break
+	}
+
+	return result, nil
 }

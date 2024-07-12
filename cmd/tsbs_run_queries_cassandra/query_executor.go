@@ -39,7 +39,7 @@ type HLQueryExecutorDoOptions struct {
 	PrettyPrintResponses bool
 }
 
-// Do takes a high-level query, constructs a query plan using the client-side
+// Do takes a high-level query, constructs a query plan using the tdengine_client-side
 // index contained within the query executor, executes that query plan, then
 // aggregates the results.
 func (qe *HLQueryExecutor) Do(q *HLQuery, opts HLQueryExecutorDoOptions) (qpLagMs, requestLagMs float64, err error) {

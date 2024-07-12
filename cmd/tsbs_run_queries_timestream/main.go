@@ -38,7 +38,7 @@ func init() {
 	config.AddToFlagSet(pflag.CommandLine)
 
 	pflag.String("aws-region", "us-east-1", "Region where the database is")
-	pflag.Duration("query-timeout", time.Minute, "Configuration for aws sdk client to timeout after")
+	pflag.Duration("query-timeout", time.Minute, "Configuration for aws sdk tdengine_client to timeout after")
 	pflag.Parse()
 
 	err := utils.SetupConfigFile()

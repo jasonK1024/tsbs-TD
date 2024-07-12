@@ -19,10 +19,10 @@ type QueryPlan interface {
 }
 
 // A QueryPlanWithServerAggregation fulfills an HLQuery by performing
-// aggregation on both the server and the client. This results in more
+// aggregation on both the server and the tdengine_client. This results in more
 // round-trip requests, but uses the server to aggregate over large datasets.
 //
-// It has 1) an Aggregator, which merges data on the client, and 2) a map of
+// It has 1) an Aggregator, which merges data on the tdengine_client, and 2) a map of
 // time interval buckets to CQL queries, which are used to retrieve data
 // relevant to each bucket.
 type QueryPlanWithServerAggregation struct {
@@ -64,7 +64,7 @@ func (qp *QueryPlanWithServerAggregation) Execute(session *gocql.Session) ([]CQL
 			// Execute one CQLQuery and collect its result
 			//
 			// For server-side aggregation, this will return only
-			// one row; for exclusive client-side aggregation this
+			// one row; for exclusive tdengine_client-side aggregation this
 			// will return a sequence.
 			iter := session.Query(q.PreparableQueryString, q.Args...).Iter()
 			var x float64
@@ -101,11 +101,11 @@ func (qp *QueryPlanWithServerAggregation) DebugQueries(level int) {
 }
 
 // A QueryPlanWithoutServerAggregation fulfills an HLQuery by performing
-// table scans on the server and aggregating all data on the client. This
+// table scans on the server and aggregating all data on the tdengine_client. This
 // results in higher bandwidth usage but fewer round-trip requests.
 //
 // It has 1) a map of Aggregators (one for each time bucket) which merge data
-// on the client, 2) a GroupByDuration, which is used to reconstruct time
+// on the tdengine_client, 2) a GroupByDuration, which is used to reconstruct time
 // buckets from a server response, 3) a set of TimeBuckets, which are used to
 // store final aggregated items, and 4) a set of CQLQueries used to fulfill
 // this plan.
@@ -150,7 +150,7 @@ func NewQueryPlanWithoutServerAggregation(aggrLabel string, groupByDuration time
 
 func csiDebugQueries(cqlQueries []CQLQuery, label string, level int) {
 	if level >= 1 {
-		fmt.Printf("[%s] query with client aggregation plan has %d CQLQuery objects\n", label, len(cqlQueries))
+		fmt.Printf("[%s] query with tdengine_client aggregation plan has %d CQLQuery objects\n", label, len(cqlQueries))
 	}
 
 	if level >= 2 {
@@ -165,7 +165,7 @@ func csiDebugQueries(cqlQueries []CQLQuery, label string, level int) {
 // TODO(rw): support parallel execution.
 func (qp *QueryPlanWithoutServerAggregation) Execute(session *gocql.Session) ([]CQLResult, error) {
 	// for each query, execute it, then put each result row into the
-	// client-side aggregator that matches its time bucket:
+	// tdengine_client-side aggregator that matches its time bucket:
 	for _, q := range qp.CQLQueries {
 		iter := session.Query(q.PreparableQueryString, q.Args...).Iter()
 
@@ -192,7 +192,7 @@ func (qp *QueryPlanWithoutServerAggregation) Execute(session *gocql.Session) ([]
 		}
 	}
 
-	// perform client-side aggregation across all buckets:
+	// perform tdengine_client-side aggregation across all buckets:
 	results := make([]CQLResult, 0, len(qp.TimeBuckets))
 	for _, ti := range qp.TimeBuckets {
 		if _, ok := qp.Aggregators[ti]; !ok {
@@ -215,7 +215,7 @@ func (qp *QueryPlanWithoutServerAggregation) DebugQueries(level int) {
 }
 
 // QueryPlanNoAggregation fulfills an HLQuery by performing queries on the
-// server and combining columns into a row on the client when there is no aggregator.
+// server and combining columns into a row on the tdengine_client when there is no aggregator.
 type QueryPlanNoAggregation struct {
 	fields     []string
 	where      string
@@ -371,7 +371,7 @@ func getWhereFn(op, pred string) func(float64) bool {
 }
 
 // QueryPlanForEvery fulfills an HLQuery by performing queries on the
-// server and combining columns into a row on the client to create
+// server and combining columns into a row on the tdengine_client to create
 // fulfill an N-for-every query.
 //
 // An N-for-every query retries the last N (TODO - first N) for every

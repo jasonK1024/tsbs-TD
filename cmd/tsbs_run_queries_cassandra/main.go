@@ -2,8 +2,8 @@
 // data from stdin.
 //
 // It reads encoded HLQuery objects from stdin, and makes concurrent requests
-// to the provided Cassandra cluster. This program is a 'heavy client', i.e.
-// it builds a client-side index of table metadata before beginning the
+// to the provided Cassandra cluster. This program is a 'heavy tdengine_client', i.e.
+// it builds a tdengine_client-side index of table metadata before beginning the
 // benchmarking.
 package main
 
@@ -47,7 +47,7 @@ var (
 var (
 	aggrPlanChoices = map[string]int{
 		"server": AggrPlanTypeWithServerAggregation,
-		"client": AggrPlanTypeWithoutServerAggregation,
+		"tdengine_client": AggrPlanTypeWithoutServerAggregation,
 	}
 )
 
@@ -65,9 +65,9 @@ func init() {
 	config.AddToFlagSet(pflag.CommandLine)
 
 	pflag.String("host", "localhost:9042", "Cassandra hostname and port combination.")
-	pflag.String("aggregation-plan", "", "Aggregation plan (choices: server, client)")
+	pflag.String("aggregation-plan", "", "Aggregation plan (choices: server, tdengine_client)")
 	pflag.Duration("read-timeout", 1*time.Second, "Maximum request timeout.")
-	pflag.Duration("client-side-index-timeout", 10*time.Second, "Maximum client-side index timeout (only used at initialization).")
+	pflag.Duration("tdengine_client-side-index-timeout", 10*time.Second, "Maximum tdengine_client-side index timeout (only used at initialization).")
 
 	pflag.Parse()
 
@@ -84,7 +84,7 @@ func init() {
 	daemonURL = viper.GetString("host")
 	aggrPlanLabel = viper.GetString("aggregation-plan")
 	requestTimeout = viper.GetDuration("read-timeout")
-	csiTimeout = viper.GetDuration("client-side-index-timeout")
+	csiTimeout = viper.GetDuration("tdengine_client-side-index-timeout")
 
 	if _, ok := aggrPlanChoices[aggrPlanLabel]; !ok {
 		log.Fatal("invalid aggregation plan")
@@ -95,7 +95,7 @@ func init() {
 }
 
 func main() {
-	// Make client-side index:
+	// Make tdengine_client-side index:
 	session = NewCassandraSession(daemonURL, runner.DatabaseName(), csiTimeout)
 	csi = NewClientSideIndex(FetchSeriesCollection(session))
 	session.Close()

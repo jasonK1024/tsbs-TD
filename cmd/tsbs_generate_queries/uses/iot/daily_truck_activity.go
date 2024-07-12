@@ -19,11 +19,11 @@ func NewDailyTruckActivity(core utils.QueryGenerator) utils.QueryFiller {
 }
 
 // Fill fills in the query.Query with query details.
-func (i *DailyTruckActivity) Fill(q query.Query) query.Query {
+func (i *DailyTruckActivity) Fill(q query.Query, zipNum int64, latestNum int64, newOrOld int) query.Query {
 	fc, ok := i.core.(DailyTruckActivityFiller)
 	if !ok {
 		common.PanicUnimplementedQuery(i.core)
 	}
-	fc.DailyTruckActivity(q)
+	fc.DailyTruckActivity(q, zipNum, latestNum, newOrOld)
 	return q
 }

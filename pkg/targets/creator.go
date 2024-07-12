@@ -26,7 +26,7 @@ type DBCreatorCloser interface {
 }
 
 // DBCreatorPost is a DBCreator that also needs to do some initialization after the
-// database is created (e.g., only one client should actually create the DB, so
+// database is created (e.g., only one tdengine_client should actually create the DB, so
 // non-creator clients should still set themselves up for writing)
 type DBCreatorPost interface {
 	DBCreator

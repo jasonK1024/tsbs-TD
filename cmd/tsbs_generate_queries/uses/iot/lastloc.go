@@ -19,11 +19,11 @@ func NewLastLocPerTruck(core utils.QueryGenerator) utils.QueryFiller {
 }
 
 // Fill fills in the query.Query with query details.
-func (i *LastLocPerTruck) Fill(q query.Query) query.Query {
+func (i *LastLocPerTruck) Fill(q query.Query, zipNum int64, latestNum int64, newOrOld int) query.Query {
 	fc, ok := i.core.(LastLocFiller)
 	if !ok {
 		common.PanicUnimplementedQuery(i.core)
 	}
-	fc.LastLocPerTruck(q)
+	fc.LastLocPerTruck(q, zipNum, latestNum, newOrOld)
 	return q
 }

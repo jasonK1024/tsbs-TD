@@ -43,7 +43,7 @@ func addLoaderRunnerFlags(fs *pflag.FlagSet) {
 	fs.Bool(
 		"loader.runner.do-create-db",
 		true,
-		"Whether to create the database. Disable on all but one client if running on a multi client setup.",
+		"Whether to create the database. Disable on all but one tdengine_client if running on a multi tdengine_client setup.",
 	)
 	fs.Uint("loader.runner.workers", 1, "Number of parallel clients inserting")
 	fs.Uint64("loader.runner.limit", 0, "Number of items to insert (0 = all of them).")

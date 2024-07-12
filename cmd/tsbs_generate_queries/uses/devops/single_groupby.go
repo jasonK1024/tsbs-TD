@@ -29,11 +29,11 @@ func NewSingleGroupby(metrics, hosts, hours int) utils.QueryFillerMaker {
 }
 
 // Fill fills in the query.Query with query details
-func (d *SingleGroupby) Fill(q query.Query) query.Query {
+func (d *SingleGroupby) Fill(q query.Query, zipNum int64, latestNum int64, newOrOld int) query.Query {
 	fc, ok := d.core.(SingleGroupbyFiller)
 	if !ok {
 		common.PanicUnimplementedQuery(d.core)
 	}
-	fc.GroupByTime(q, d.hosts, d.metrics, time.Duration(int64(d.hours)*int64(time.Hour)))
+	fc.GroupByTime(q, d.hosts, d.metrics, time.Duration(int64(d.hours)*int64(time.Hour)), zipNum, latestNum, newOrOld)
 	return q
 }

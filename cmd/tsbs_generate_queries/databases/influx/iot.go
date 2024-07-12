@@ -36,6 +36,16 @@ func (i *IoT) getTrucksWhereWithNames(names []string) string {
 	return "(" + combinedHostnameClause + ")"
 }
 
+func (i *IoT) getContinuousTrucksWhereWithNames(names []string) string {
+	nameClauses := []string{}
+	for _, s := range names {
+		nameClauses = append(nameClauses, fmt.Sprintf("\"name\" = '%s'", s))
+	}
+
+	combinedHostnameClause := strings.Join(nameClauses, " or ")
+	return "(" + combinedHostnameClause + ")"
+}
+
 func (i *IoT) getTruckWhereString(nTrucks int) string {
 	names, err := i.GetRandomTrucks(nTrucks)
 	if err != nil {
@@ -44,8 +54,16 @@ func (i *IoT) getTruckWhereString(nTrucks int) string {
 	return i.getTrucksWhereWithNames(names)
 }
 
+func (i *IoT) getContinuousTruckWhereString() string {
+	names, err := i.GetContinuousRandomTrucks()
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getContinuousTrucksWhereWithNames(names)
+}
+
 // LastLocByTruck finds the truck location for nTrucks.
-func (i *IoT) LastLocByTruck(qi query.Query, nTrucks int) {
+func (i *IoT) LastLocByTruck(qi query.Query, nTrucks int, zipNum int64, latestNum int64, newOrOld int) {
 	influxql := fmt.Sprintf(`SELECT "name", "driver", "latitude", "longitude" 
 		FROM "readings" 
 		WHERE %s 
@@ -60,7 +78,7 @@ func (i *IoT) LastLocByTruck(qi query.Query, nTrucks int) {
 }
 
 // LastLocPerTruck finds all the truck locations along with truck and driver names.
-func (i *IoT) LastLocPerTruck(qi query.Query) {
+func (i *IoT) LastLocPerTruck(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 
 	influxql := fmt.Sprintf(`SELECT "latitude", "longitude" 
 		FROM "readings" 
@@ -77,7 +95,7 @@ func (i *IoT) LastLocPerTruck(qi query.Query) {
 }
 
 // TrucksWithLowFuel finds all trucks with low fuel (less than 10%).
-func (i *IoT) TrucksWithLowFuel(qi query.Query) {
+func (i *IoT) TrucksWithLowFuel(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	influxql := fmt.Sprintf(`SELECT "name", "driver", "fuel_state" 
 		FROM "diagnostics" 
 		WHERE "fuel_state" <= 0.1 AND "fleet" = '%s' 
@@ -93,7 +111,7 @@ func (i *IoT) TrucksWithLowFuel(qi query.Query) {
 }
 
 // TrucksWithHighLoad finds all trucks that have load over 90%.
-func (i *IoT) TrucksWithHighLoad(qi query.Query) {
+func (i *IoT) TrucksWithHighLoad(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	influxql := fmt.Sprintf(`SELECT "name", "driver", "current_load", "load_capacity" 
 		FROM (SELECT  "current_load", "load_capacity" 
 		 FROM "diagnostics" WHERE fleet = '%s' 
@@ -112,7 +130,7 @@ func (i *IoT) TrucksWithHighLoad(qi query.Query) {
 }
 
 // StationaryTrucks finds all trucks that have low average velocity in a time window.
-func (i *IoT) StationaryTrucks(qi query.Query) {
+func (i *IoT) StationaryTrucks(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	interval := i.Interval.MustRandWindow(iot.StationaryDuration)
 	influxql := fmt.Sprintf(`SELECT "name", "driver" 
 		FROM(SELECT mean("velocity") as mean_velocity 
@@ -133,7 +151,7 @@ func (i *IoT) StationaryTrucks(qi query.Query) {
 }
 
 // TrucksWithLongDrivingSessions finds all trucks that have not stopped at least 20 mins in the last 4 hours.
-func (i *IoT) TrucksWithLongDrivingSessions(qi query.Query) {
+func (i *IoT) TrucksWithLongDrivingSessions(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	interval := i.Interval.MustRandWindow(iot.LongDrivingSessionDuration)
 	influxql := fmt.Sprintf(`SELECT "name","driver" 
 		FROM(SELECT count(*) AS ten_min 
@@ -157,7 +175,7 @@ func (i *IoT) TrucksWithLongDrivingSessions(qi query.Query) {
 }
 
 // TrucksWithLongDailySessions finds all trucks that have driven more than 10 hours in the last 24 hours.
-func (i *IoT) TrucksWithLongDailySessions(qi query.Query) {
+func (i *IoT) TrucksWithLongDailySessions(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	interval := i.Interval.MustRandWindow(iot.DailyDrivingDuration)
 	influxql := fmt.Sprintf(`SELECT "name","driver" 
 		FROM(SELECT count(*) AS ten_min 
@@ -181,7 +199,7 @@ func (i *IoT) TrucksWithLongDailySessions(qi query.Query) {
 }
 
 // AvgVsProjectedFuelConsumption calculates average and projected fuel consumption per fleet.
-func (i *IoT) AvgVsProjectedFuelConsumption(qi query.Query) {
+func (i *IoT) AvgVsProjectedFuelConsumption(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	influxql := `SELECT mean("fuel_consumption") AS "mean_fuel_consumption", mean("nominal_fuel_consumption") AS "nominal_fuel_consumption" 
 		FROM "readings" 
 		WHERE "velocity" > 1 
@@ -194,7 +212,7 @@ func (i *IoT) AvgVsProjectedFuelConsumption(qi query.Query) {
 }
 
 // AvgDailyDrivingDuration finds the average driving duration per driver.
-func (i *IoT) AvgDailyDrivingDuration(qi query.Query) {
+func (i *IoT) AvgDailyDrivingDuration(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	start := i.Interval.Start().Format(time.RFC3339)
 	end := i.Interval.End().Format(time.RFC3339)
 	influxql := fmt.Sprintf(`SELECT count("mv")/6 as "hours driven" 
@@ -217,7 +235,7 @@ func (i *IoT) AvgDailyDrivingDuration(qi query.Query) {
 }
 
 // AvgDailyDrivingSession finds the average driving session without stopping per driver per day.
-func (i *IoT) AvgDailyDrivingSession(qi query.Query) {
+func (i *IoT) AvgDailyDrivingSession(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	start := i.Interval.Start().Format(time.RFC3339)
 	end := i.Interval.End().Format(time.RFC3339)
 	influxql := fmt.Sprintf(`SELECT "elapsed" 
@@ -252,7 +270,7 @@ func (i *IoT) AvgDailyDrivingSession(qi query.Query) {
 }
 
 // AvgLoad finds the average load per truck model per fleet.
-func (i *IoT) AvgLoad(qi query.Query) {
+func (i *IoT) AvgLoad(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	influxql := `SELECT mean("ml") AS mean_load_percentage 
 		FROM (SELECT "current_load"/"load_capacity" AS "ml" 
 		 FROM "diagnostics" 
@@ -266,7 +284,7 @@ func (i *IoT) AvgLoad(qi query.Query) {
 }
 
 // DailyTruckActivity returns the number of hours trucks has been active (not out-of-commission) per day per fleet per model.
-func (i *IoT) DailyTruckActivity(qi query.Query) {
+func (i *IoT) DailyTruckActivity(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	start := i.Interval.Start().Format(time.RFC3339)
 	end := i.Interval.End().Format(time.RFC3339)
 	influxql := fmt.Sprintf(`SELECT count("ms")/144 
@@ -289,7 +307,7 @@ func (i *IoT) DailyTruckActivity(qi query.Query) {
 }
 
 // TruckBreakdownFrequency calculates the amount of times a truck model broke down in the last period.
-func (i *IoT) TruckBreakdownFrequency(qi query.Query) {
+func (i *IoT) TruckBreakdownFrequency(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	start := i.Interval.Start().Format(time.RFC3339)
 	end := i.Interval.End().Format(time.RFC3339)
 	influxql := fmt.Sprintf(`SELECT count("state_changed") 
@@ -322,4 +340,483 @@ func tenMinutePeriods(minutesPerHour float64, duration time.Duration) int {
 	durationMinutes := duration.Minutes()
 	leftover := minutesPerHour * duration.Hours()
 	return int((durationMinutes - leftover) / 10)
+}
+
+var RandomTag bool = true
+var TagNum int = 10
+
+func (i *IoT) ReadingsVelocityPredicate(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	// todo
+	if !RandomTag {
+		influxql = fmt.Sprintf(
+			`SELECT velocity,fuel_consumption,grade FROM "readings" WHERE %s AND velocity > 90 AND fuel_consumption > 40 AND TIME >= '%s' AND TIME < '%s' GROUP BY "name"`,
+			i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+	} else {
+		influxql = fmt.Sprintf(
+			`SELECT velocity,fuel_consumption,grade FROM "readings" WHERE %s AND velocity > 90 AND fuel_consumption > 40 AND TIME >= '%s' AND TIME < '%s' GROUP BY "name"`,
+			i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+	}
+
+	humanLabel := "Influx ReadingsVelocity with Predicate IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) OnlyField1(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE ("name" = 'truck_0') AND TIME >= '%s' AND TIME < '%s' group by time(1m)`,
+		interval.StartString(), interval.EndString())
+	//influxql = fmt.Sprintf(
+	//	`SELECT mean(latitude) FROM "readings" WHERE TIME >= '%s' AND TIME < '%s' GROUP BY time(2m)`,
+	//	interval.StartString(), interval.EndString())
+
+	humanLabel := "Influx Only Field 1 queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) OnlyField2(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE ("name" = 'truck_0') AND TIME >= '%s' AND TIME < '%s'  group by time(1m) `,
+		interval.StartString(), interval.EndString())
+	//influxql = fmt.Sprintf(
+	//	`SELECT mean(current_load) FROM "diagnostics" WHERE TIME >= '%s' AND TIME < '%s' GROUP BY time(2m) `,
+	//	interval.StartString(), interval.EndString())
+
+	humanLabel := "Influx Only Field 2 queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) OnlyField3(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(fuel_state),mean(fuel_capacity) FROM "diagnostics" WHERE ("name" = 'truck_0') AND TIME >= '%s' AND TIME < '%s'  group by time(1m) `,
+		interval.StartString(), interval.EndString())
+	//influxql = fmt.Sprintf(
+	//	`SELECT mean(velocity) FROM "readings" WHERE TIME >= '%s' AND TIME < '%s' GROUP BY time(2m) `,
+	//	interval.StartString(), interval.EndString())
+
+	humanLabel := "Influx Only Field 3 queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) OnlyField4(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity) FROM "diagnostics" WHERE ("name" = 'truck_0') AND TIME >= '%s' AND TIME < '%s'  group by time(1m) `,
+		interval.StartString(), interval.EndString())
+	//influxql = fmt.Sprintf(
+	//	`SELECT mean(elevation) FROM "readings" WHERE TIME >= '%s' AND TIME < '%s' GROUP BY time(2m) `,
+	//	interval.StartString(), interval.EndString())
+
+	humanLabel := "Influx Only Field 4 queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) OnlyField5(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE ("name" = 'truck_0') AND TIME >= '%s' AND TIME < '%s'  group by time(10m) `,
+		interval.StartString(), interval.EndString())
+	//influxql = fmt.Sprintf(
+	//	`SELECT mean(fuel_capacity) FROM "diagnostics" WHERE TIME >= '%s' AND TIME < '%s' GROUP BY time(2m) `,
+	//	interval.StartString(), interval.EndString())
+
+	humanLabel := "Influx Only Field 5 queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) OnlyField6(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE ("name" = 'truck_0') AND TIME >= '%s' AND TIME < '%s'  group by time(10m) `,
+		interval.StartString(), interval.EndString())
+	//influxql = fmt.Sprintf(
+	//	`SELECT mean(load_capacity) FROM "diagnostics" WHERE TIME >= '%s' AND TIME < '%s' GROUP BY time(2m) `,
+	//	interval.StartString(), interval.EndString())
+
+	humanLabel := "Influx Only Field 6 queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) OnlyField7(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE ("name" = 'truck_0') AND TIME >= '%s' AND TIME < '%s'  group by time(10m) `,
+		interval.StartString(), interval.EndString())
+	//influxql = fmt.Sprintf(
+	//	`SELECT mean(fuel_consumption) FROM "readings" WHERE TIME >= '%s' AND TIME < '%s' GROUP BY time(2m) `,
+	//	interval.StartString(), interval.EndString())
+
+	humanLabel := "Influx Only Field 7 queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) OnlyField8(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE ("name" = 'truck_0') AND TIME >= '%s' AND TIME < '%s'  group by time(10m) `,
+		interval.StartString(), interval.EndString())
+	//influxql = fmt.Sprintf(
+	//	`SELECT mean(nominal_fuel_consumption) FROM "readings" WHERE TIME >= '%s' AND TIME < '%s' GROUP BY time(2m) `,
+	//	interval.StartString(), interval.EndString())
+
+	humanLabel := "Influx Only Field 8 queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) ReadingsPosition(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	if !RandomTag {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		}
+	} else {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		}
+	}
+
+	humanLabel := "Influx ReadingsPosition IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) ReadingsPosition2(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	if !RandomTag {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		}
+	} else {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		}
+	}
+
+	humanLabel := "Influx ReadingsPosition2 IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	// todo
+	if !RandomTag {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		}
+	} else {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		}
+	}
+
+	humanLabel := "Influx DiagnosticsLoad IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	// todo
+	if !RandomTag {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		}
+	} else {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		}
+	}
+
+	humanLabel := "Influx DiagnosticsLoad Five IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) ReadingsVelocityAndFuel(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	// todo
+	if !RandomTag {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		}
+	} else {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		}
+	}
+
+	humanLabel := "Influx ReadingsVelocity IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) ReadingsVelocityAndFuel2(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	// todo
+	if !RandomTag {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		}
+	} else {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		}
+	}
+
+	humanLabel := "Influx ReadingsVelocity 2 IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) ReadingsAvgFuelConsumption(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	if !RandomTag {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
+		}
+	} else {
+		if zipNum < 5 {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		} else {
+			influxql = fmt.Sprintf(
+				`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
+				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
+		}
+	}
+
+	humanLabel := "Influx ReadingsAvgFuelConsumption IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+var index int = 0
+
+func (i *IoT) MultiQueries(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+
+	switch index % 7 {
+	case 0:
+		i.ReadingsPosition(qi, zipNum, latestNum, newOrOld)
+		break
+	case 1:
+		i.ReadingsPosition2(qi, zipNum, latestNum, newOrOld)
+		break
+	case 2:
+		i.DiagnosticsLoad(qi, zipNum, latestNum, newOrOld)
+		break
+	case 3:
+		i.ReadingsVelocityAndFuel(qi, zipNum, latestNum, newOrOld)
+		break
+	case 4:
+		i.ReadingsAvgFuelConsumption(qi, zipNum, latestNum, newOrOld)
+		break
+	case 5:
+		i.DiagnosticsFive(qi, zipNum, latestNum, newOrOld)
+		break
+	case 6:
+		i.ReadingsVelocityAndFuel2(qi, zipNum, latestNum, newOrOld)
+		break
+	default:
+		i.ReadingsPosition(qi, zipNum, latestNum, newOrOld)
+		break
+	}
+
+	fmt.Printf("number:\t%d\n", index)
+	index++
+}
+
+func (i *IoT) IoTQueries(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+
+	switch index % 8 {
+	case 0:
+		i.ReadingsPosition(qi, zipNum, latestNum, newOrOld)
+		break
+	case 1:
+		i.ReadingsPosition2(qi, zipNum, latestNum, newOrOld)
+		break
+	case 2:
+		i.DiagnosticsLoad(qi, zipNum, latestNum, newOrOld)
+		break
+	case 3:
+		i.ReadingsVelocityAndFuel(qi, zipNum, latestNum, newOrOld)
+		break
+	case 4:
+		i.ReadingsAvgFuelConsumption(qi, zipNum, latestNum, newOrOld)
+		break
+	case 5:
+		i.DiagnosticsFive(qi, zipNum, latestNum, newOrOld)
+		break
+	case 6:
+		i.ReadingsVelocityAndFuel2(qi, zipNum, latestNum, newOrOld)
+		break
+	case 7:
+		i.ReadingsVelocityPredicate(qi, zipNum, latestNum, newOrOld)
+		break
+	default:
+		i.ReadingsPosition(qi, zipNum, latestNum, newOrOld)
+		break
+	}
+
+	//fmt.Printf("number:\t%d\n", index)
+	index++
+}
+
+func (i *IoT) OnlyFieldQueries(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+
+	switch index % 4 {
+	case 0:
+		i.OnlyField1(qi, zipNum, latestNum, newOrOld)
+		break
+	case 1:
+		i.OnlyField2(qi, zipNum, latestNum, newOrOld)
+		break
+	case 2:
+		i.OnlyField3(qi, zipNum, latestNum, newOrOld)
+		break
+	case 3:
+		i.OnlyField4(qi, zipNum, latestNum, newOrOld)
+		break
+	//case 4:
+	//	i.OnlyField5(qi, zipNum, latestNum, newOrOld)
+	//	break
+	//case 5:
+	//	i.OnlyField6(qi, zipNum, latestNum, newOrOld)
+	//	break
+	//case 6:
+	//	i.OnlyField7(qi, zipNum, latestNum, newOrOld)
+	//	break
+	//case 7:
+	//	i.OnlyField8(qi, zipNum, latestNum, newOrOld)
+	//	break
+	default:
+		i.OnlyField1(qi, zipNum, latestNum, newOrOld)
+		break
+	}
+
+	fmt.Printf("number:\t%d\n", index)
+	index++
 }

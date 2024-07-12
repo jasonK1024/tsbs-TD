@@ -3,8 +3,12 @@ package main
 import (
 	"database/sql/driver"
 	"fmt"
+	"github.com/taosdata/driver-go/v3/wrapper"
+	"github.com/taosdata/tsbs/TDengine_Client/tdengine_client"
+	"log"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/blagojts/viper"
 	"github.com/spf13/pflag"
@@ -22,6 +26,11 @@ var (
 	runner *query.BenchmarkRunner
 )
 
+var (
+	daemonUrls []string
+	DBConns    []unsafe.Pointer
+)
+
 func init() {
 	var config query.BenchmarkRunnerConfig
 	config.AddToFlagSet(pflag.CommandLine)
@@ -30,6 +39,9 @@ func init() {
 	pflag.String("pass", "taosdata", "Password for the user connecting to TDengine")
 	pflag.String("host", "", "TDengine host")
 	pflag.Int("port", 6030, "TDengine Port")
+
+	pflag.String("db", "", "tdengine or influxdb")
+
 	pflag.Parse()
 	err := utils.SetupConfigFile()
 
@@ -43,6 +55,20 @@ func init() {
 	pass = viper.GetString("pass")
 	host = viper.GetString("host")
 	port = viper.GetInt("port")
+
+	tdengine_client.DB = viper.GetString("db-name")
+	tdengine_client.DbName = viper.GetString("db")
+
+	// todo	多数据库
+	daemonUrls = strings.Split(host, ",")
+	if len(daemonUrls) == 0 {
+		log.Fatal("missing 'host' flag")
+	}
+	DBConns = make([]unsafe.Pointer, len(daemonUrls))
+	for i := range daemonUrls {
+		DBConns[i], _ = wrapper.TaosConnect(daemonUrls[i], user, pass, tdengine_client.DB, port)
+	}
+
 	runner = query.NewBenchmarkRunner(config)
 }
 func main() {
@@ -55,8 +81,9 @@ type queryExecutorOptions struct {
 }
 
 type processor struct {
-	db   *commonpool.Conn
-	opts *queryExecutorOptions
+	db        *commonpool.Conn
+	opts      *queryExecutorOptions
+	workerNum int
 }
 
 func (p *processor) Init(workerNum int) {
@@ -75,6 +102,7 @@ func (p *processor) Init(workerNum int) {
 		debug:         runner.DebugLevel() > 0,
 		printResponse: runner.DoPrintResponses(),
 	}
+	p.workerNum = workerNum
 }
 
 func (p *processor) ProcessQuery(q query.Query, _ bool) ([]*query.Stat, error) {
@@ -103,18 +131,24 @@ func (p *processor) ProcessQuery(q query.Query, _ bool) ([]*query.Stat, error) {
 		}
 		qry = querys[len(preQuerys)-1]
 	}
-	data, err := async.GlobalAsync.TaosExec(p.db.TaosConnection, qry, func(ts int64, precision int) driver.Value {
+	//data, err := async.GlobalAsync.TaosExec(p.db.TaosConnection, qry, func(ts int64, precision int) driver.Value {
+	//	return ts
+	//})
+	data, err := async.GlobalAsync.TaosExec(DBConns[p.workerNum%len(DBConns)], qry, func(ts int64, precision int) driver.Value {
 		return ts
 	})
 	if err != nil {
 		return nil, err
 	}
 	if p.opts.printResponse {
-		fmt.Printf("%#v\n", data)
+		//fmt.Printf("%#v\n", data)
+		fmt.Println("data row length: ", len(data.Data))
 	}
 	took := float64(time.Since(start).Nanoseconds()) / 1e6
 	stat := query.GetStat()
-	stat.Init(q.HumanLabelName(), took)
+
+	//stat.Init(q.HumanLabelName(), took, byteLength, hitKind)
+	stat.InitWithParam(q.HumanLabelName(), took, 0, 0)
 
 	return []*query.Stat{stat}, err
 }

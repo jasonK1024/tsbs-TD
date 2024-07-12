@@ -52,6 +52,8 @@ const (
 	LabelDailyActivity = "daily-activity"
 	// LabelBreakdownFrequency is the label for the breakdown frequency query.
 	LabelBreakdownFrequency = "breakdown-frequency"
+
+	LabelIoTQueries = "iot-queries"
 )
 
 // Core is the common component of all generators for all systems.
@@ -74,6 +76,10 @@ func NewCore(start, end time.Time, scale int) (*Core, error) {
 // GetRandomTrucks returns a random set of nTrucks from a given Core
 func (c *Core) GetRandomTrucks(nTrucks int) ([]string, error) {
 	return getRandomTrucks(nTrucks, c.Scale)
+}
+
+func (c *Core) GetContinuousRandomTrucks() ([]string, error) {
+	return getContinuousRandomTrucks()
 }
 
 // getRandomTruckNames returns a subset of numTrucks names of a permutation of truck names,
@@ -100,67 +106,85 @@ func getRandomTrucks(numTrucks int, totalTrucks int) ([]string, error) {
 	return truckNames, nil
 }
 
+func getContinuousRandomTrucks() ([]string, error) {
+
+	randomNumbers, err := common.GetContinuousRandomSubset()
+	if err != nil {
+		return nil, err
+	}
+
+	truckNames := []string{}
+	for _, n := range randomNumbers {
+		truckNames = append(truckNames, fmt.Sprintf("truck_%d", n))
+	}
+	return truckNames, nil
+}
+
+type IoTQueriesFiller interface {
+	IoTQueries(query.Query, int64, int64, int)
+}
+
 // LastLocFiller is a type that can fill in a last location query.
 type LastLocFiller interface {
-	LastLocPerTruck(query.Query)
+	LastLocPerTruck(query.Query, int64, int64, int)
 }
 
 // LastLocByTruckFiller is a type that can fill in a last location query for a number of trucks.
 type LastLocByTruckFiller interface {
-	LastLocByTruck(query.Query, int)
+	LastLocByTruck(query.Query, int, int64, int64, int)
 }
 
 // TruckLowFuelFiller is a type that can fill in a trucks with low fuel query.
 type TruckLowFuelFiller interface {
-	TrucksWithLowFuel(query.Query)
+	TrucksWithLowFuel(query.Query, int64, int64, int)
 }
 
 // TruckHighLoadFiller is a type that can fill in a trucks with high load query.
 type TruckHighLoadFiller interface {
-	TrucksWithHighLoad(query.Query)
+	TrucksWithHighLoad(query.Query, int64, int64, int)
 }
 
 // StationaryTrucksFiller is a type that can fill in the stationary trucks query.
 type StationaryTrucksFiller interface {
-	StationaryTrucks(query.Query)
+	StationaryTrucks(query.Query, int64, int64, int)
 }
 
 // TruckLongDrivingSessionFiller is a type that can fill in a trucks with longer driving sessions query.
 type TruckLongDrivingSessionFiller interface {
-	TrucksWithLongDrivingSessions(query.Query)
+	TrucksWithLongDrivingSessions(query.Query, int64, int64, int)
 }
 
 // TruckLongDailySessionFiller is a type that can fill in a trucks with longer daily driving sessions query.
 type TruckLongDailySessionFiller interface {
-	TrucksWithLongDailySessions(query.Query)
+	TrucksWithLongDailySessions(query.Query, int64, int64, int)
 }
 
 // AvgVsProjectedFuelConsumptionFiller is a type that can fill in an avg vs projected fuel consumption query.
 type AvgVsProjectedFuelConsumptionFiller interface {
-	AvgVsProjectedFuelConsumption(query.Query)
+	AvgVsProjectedFuelConsumption(query.Query, int64, int64, int)
 }
 
 // AvgDailyDrivingDurationFiller is a type that can fill in an avg daily driving duration per driver query.
 type AvgDailyDrivingDurationFiller interface {
-	AvgDailyDrivingDuration(query.Query)
+	AvgDailyDrivingDuration(query.Query, int64, int64, int)
 }
 
 // AvgDailyDrivingSessionFiller is a type that can fill in an avg daily driving session query.
 type AvgDailyDrivingSessionFiller interface {
-	AvgDailyDrivingSession(query.Query)
+	AvgDailyDrivingSession(query.Query, int64, int64, int)
 }
 
 // AvgLoadFiller is a type that can fill in an avg load query.
 type AvgLoadFiller interface {
-	AvgLoad(query.Query)
+	AvgLoad(query.Query, int64, int64, int)
 }
 
 // DailyTruckActivityFiller is a type that can fill in the daily truck activity query.
 type DailyTruckActivityFiller interface {
-	DailyTruckActivity(query.Query)
+	DailyTruckActivity(query.Query, int64, int64, int)
 }
 
 // TruckBreakdownFrequencyFiller is a type that can fill in the truck breakdown frequency query.
 type TruckBreakdownFrequencyFiller interface {
-	TruckBreakdownFrequency(query.Query)
+	TruckBreakdownFrequency(query.Query, int64, int64, int)
 }

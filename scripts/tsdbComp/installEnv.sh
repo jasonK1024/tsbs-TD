@@ -11,7 +11,7 @@ installGoEnv=false
 installDB=false
 installTsbs=false
 
-#client and server paras
+#tdengine_client and server paras
 clientIP="192.168.0.203"
 clientHost="trd03"
 serverIP="192.168.0.204"

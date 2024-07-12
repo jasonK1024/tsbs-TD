@@ -104,7 +104,7 @@ func (d *dbCreator) PostCreateDB(dbName string) error {
 		if d.opts.CreateMetricsTable {
 			d.createTableAndIndexes(dbBench, tableName, fieldDefs, indexDefs)
 		} else {
-			// If not creating table, wait for another client to set it up
+			// If not creating table, wait for another tdengine_client to set it up
 			i := 0
 			checkTableQuery := fmt.Sprintf("SELECT * FROM pg_tables WHERE tablename = '%s'", tableName)
 			r := MustQuery(dbBench, checkTableQuery)

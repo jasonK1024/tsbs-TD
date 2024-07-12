@@ -17,7 +17,7 @@ var bytesSlash = []byte("/") // heap optimization
 
 // HTTPClient is a reusable HTTP Client.
 type HTTPClient struct {
-	//client     fasthttp.Client
+	//tdengine_client     fasthttp.Client
 	client     *http.Client
 	Host       []byte
 	HostString string

@@ -36,6 +36,8 @@ const (
 	LabelGroupbyOrderbyLimit = "groupby-orderby-limit"
 	// LabelHighCPU is the prefix for queries of the high-CPU variety
 	LabelHighCPU = "high-cpu"
+
+	LabelCPUQueries = "cpu-queries"
 )
 
 // Core is the common component of all generators for all systems
@@ -80,6 +82,10 @@ func GetCPUMetricsSlice(numMetrics int) ([]string, error) {
 	return cpuMetrics[:numMetrics], nil
 }
 
+type CPUQueriesFiller interface {
+	CPUQueries(query.Query, int64, int64, int)
+}
+
 // GetAllCPUMetrics returns all the metrics for CPU
 func GetAllCPUMetrics() []string {
 	return cpuMetrics
@@ -92,7 +98,7 @@ func GetCPUMetricsLen() int {
 
 // SingleGroupbyFiller is a type that can fill in a single groupby query
 type SingleGroupbyFiller interface {
-	GroupByTime(query.Query, int, int, time.Duration)
+	GroupByTime(query.Query, int, int, time.Duration, int64, int64, int)
 }
 
 // DoubleGroupbyFiller is a type that can fill in a double groupby query

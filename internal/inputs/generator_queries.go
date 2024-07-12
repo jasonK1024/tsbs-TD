@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"sort"
+	"sync"
 	"time"
 
 	queryUtils "github.com/taosdata/tsbs/cmd/tsbs_generate_queries/utils"
@@ -15,6 +16,9 @@ import (
 	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"github.com/taosdata/tsbs/pkg/query/config"
 	"github.com/taosdata/tsbs/pkg/query/factories"
+
+	"github.com/taosdata/tsbs/zipfian/counter"
+	"github.com/taosdata/tsbs/zipfian/distributionGenerator"
 )
 
 // Error messages when using a QueryGenerator
@@ -216,9 +220,59 @@ func (g *QueryGenerator) runQueryGeneration(useGen queryUtils.QueryGenerator, fi
 		}
 	}
 
+	// 加入两个分布，用于生成随机时间范围
+	zipfian := distributionGenerator.NewZipfianWithItems(10, distributionGenerator.ZipfianConstant)
+	cntrForNew := counter.NewCounter(1 * 365 * 2)
+	latestForNew := distributionGenerator.NewSkewedLatest(cntrForNew)
+	cntrForOld := counter.NewCounter(90 * 2)
+	latestForOld := distributionGenerator.NewSkewedLatest(cntrForOld)
+
+	zipNums := make([]int64, 0)
+	latestNums := make([]int64, 0)
+	newOrOld := make([]int, 0) // 1 为旧数据，0 为新数据
+	rz := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rl := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	var mu sync.Mutex
+	random := func() {
+		mu.Lock()
+
+		zipNum := zipfian.Next(rz)
+		zipNums = append(zipNums, zipNum)
+
+		rdm := rand.Intn(common.Ratio[0] + common.Ratio[1])
+		if rdm < common.Ratio[0] { // 生成对最新数据的查询
+			latestNumForNew := latestForNew.Next(rl)
+			latestNums = append(latestNums, latestNumForNew)
+			newOrOld = append(newOrOld, 0)
+		} else { // 生成对旧数据的查询
+			latestNumForOld := latestForOld.Next(rl)
+			latestNums = append(latestNums, latestNumForOld)
+			newOrOld = append(newOrOld, 1)
+		}
+
+		//fmt.Printf("zipnum:\t%d\tlatestnum:\t%d\n", zipNum, latestNumForNew)
+		mu.Unlock()
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < int(c.Limit); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			random()
+		}()
+	}
+
+	// 等待所有goroutine完成
+	wg.Wait()
+
 	for i := 0; i < int(c.Limit); i++ {
 		q := useGen.GenerateEmptyQuery()
-		q = filler.Fill(q)
+
+		//q = filler.Fill(q)
+
+		q = filler.Fill(q, zipNums[i], latestNums[i], newOrOld[i])
 
 		if currentGroup == c.InterleavedGroupID {
 			err := enc.Encode(q)
@@ -250,6 +304,10 @@ func (g *QueryGenerator) runQueryGeneration(useGen queryUtils.QueryGenerator, fi
 			currentGroup = 0
 		}
 	}
+
+	fmt.Printf("ratio:\t%d\n", common.Ratio)
+	//fmt.Println("random: ", influx.RandomTag)
+	//fmt.Printf("tag num:\t%d\n", influx.TagNum)
 
 	// Print stats:
 	keys := []string{}

@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	influxdb_client "github.com/taosdata/tsbs/InfluxDB-client/v2"
 	"log"
 	"strings"
 
@@ -27,6 +28,11 @@ var (
 	runner *query.BenchmarkRunner
 )
 
+//	var DBConn, err = client.NewHTTPClient(client.HTTPConfig{
+//		Addr: "http://192.168.1.103:8086",
+//	})
+var DBConn []influxdb_client.Client
+
 // Parse args:
 func init() {
 	var config query.BenchmarkRunnerConfig
@@ -35,7 +41,7 @@ func init() {
 
 	pflag.String("urls", "http://localhost:8086", "Daemon URLs, comma-separated. Will be used in a round-robin fashion.")
 	pflag.Uint64("chunk-response-size", 0, "Number of series to chunk results into. 0 means no chunking.")
-
+	pflag.String("db", "", "tdengine or influxdb")
 	pflag.Parse()
 
 	err := utils.SetupConfigFile()
@@ -50,11 +56,20 @@ func init() {
 
 	csvDaemonUrls = viper.GetString("urls")
 	chunkSize = viper.GetUint64("chunk-response-size")
+	influxdb_client.DB = viper.GetString("db-name")
+	influxdb_client.DbName = viper.GetString("db")
 
 	daemonUrls = strings.Split(csvDaemonUrls, ",")
 	if len(daemonUrls) == 0 {
 		log.Fatal("missing 'urls' flag")
 	}
+	DBConn = make([]influxdb_client.Client, len(daemonUrls))
+	// todo	多数据库
+	for i := range daemonUrls {
+		DBConn[i], _ = influxdb_client.NewHTTPClient(influxdb_client.HTTPConfig{Addr: daemonUrls[i]})
+	}
+	influxdb_client.TagKV = influxdb_client.GetTagKV(DBConn[0], influxdb_client.DB)
+	influxdb_client.Fields = influxdb_client.GetFieldKeys(DBConn[0], influxdb_client.DB)
 
 	runner = query.NewBenchmarkRunner(config)
 }
@@ -64,8 +79,9 @@ func main() {
 }
 
 type processor struct {
-	w    *HTTPClient
-	opts *HTTPClientDoOptions
+	w         *HTTPClient
+	opts      *HTTPClientDoOptions
+	workerNum int
 }
 
 func newProcessor() query.Processor { return &processor{} }
@@ -79,15 +95,26 @@ func (p *processor) Init(workerNumber int) {
 	}
 	url := daemonUrls[workerNumber%len(daemonUrls)]
 	p.w = NewHTTPClient(url)
+
+	p.workerNum = workerNumber
 }
 
 func (p *processor) ProcessQuery(q query.Query, _ bool) ([]*query.Stat, error) {
 	hq := q.(*query.HTTP)
-	lag, err := p.w.Do(hq, p.opts)
+
+	//println(string(hq.Path))
+	//println(len(string(hq.Path)))
+	//println(len(string(hq.RawQuery)))
+	//println(string(hq.RawQuery))
+
+	// todo
+	lag, byteLength, hitKind, err := p.w.Do(hq, p.opts, p.workerNum)
+
 	if err != nil {
 		return nil, err
 	}
+	// todo
 	stat := query.GetStat()
-	stat.Init(q.HumanLabelName(), lag)
+	stat.InitWithParam(q.HumanLabelName(), lag, byteLength, hitKind)
 	return []*query.Stat{stat}, nil
 }

@@ -4,8 +4,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/taosdata/tsbs/cmd/tsbs_generate_queries/databases/tdengine"
+	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"github.com/taosdata/tsbs/pkg/query/config"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/blagojts/viper"
@@ -35,6 +39,8 @@ var useCaseMatrix = map[string]map[string]utils.QueryFillerMaker{
 		devops.LabelHighCPU + "-all":          devops.NewHighCPU(0),
 		devops.LabelHighCPU + "-1":            devops.NewHighCPU(1),
 		devops.LabelLastpoint:                 devops.NewLastPointPerHost,
+
+		devops.LabelCPUQueries: devops.NewCPUQueries,
 	},
 	"iot": {
 		iot.LabelLastLoc:                       iot.NewLastLocPerTruck,
@@ -50,6 +56,8 @@ var useCaseMatrix = map[string]map[string]utils.QueryFillerMaker{
 		iot.LabelAvgLoad:                       iot.NewAvgLoad,
 		iot.LabelDailyActivity:                 iot.NewDailyTruckActivity,
 		iot.LabelBreakdownFrequency:            iot.NewTruckBreakdownFrequency,
+
+		iot.LabelIoTQueries: iot.NewIoTQueries,
 	},
 }
 
@@ -89,6 +97,22 @@ func init() {
 	if err := viper.Unmarshal(&conf); err != nil {
 		panic(fmt.Errorf("unable to decode config: %s", err))
 	}
+
+	ratioString := viper.GetString("ratio")
+	nums := strings.Split(ratioString, ":")
+	n1, err := strconv.Atoi(nums[0])
+	if err != nil {
+		panic(fmt.Errorf("unable to decode ratio string: %s", ratioString))
+	}
+	n2, err := strconv.Atoi(nums[1])
+	if err != nil {
+		panic(fmt.Errorf("unable to decode ratio string: %s", ratioString))
+	}
+	common.Ratio[0] = n1
+	common.Ratio[1] = n2
+
+	tdengine.RandomTag = viper.GetBool("random-tag")
+	tdengine.TagNum = viper.GetInt("tag-num")
 }
 
 func main() {

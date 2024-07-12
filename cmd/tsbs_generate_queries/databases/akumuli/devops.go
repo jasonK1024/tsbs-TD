@@ -70,9 +70,11 @@ type tsdbAggregateAllQuery struct {
 // SELECT minute, max(metric1), ..., max(metricN)
 // FROM cpu
 // WHERE
-// 		(hostname = '$HOSTNAME_1' OR ... OR hostname = '$HOSTNAME_N')
-// 	AND time >= '$HOUR_START'
-// 	AND time < '$HOUR_END'
+//
+//		(hostname = '$HOSTNAME_1' OR ... OR hostname = '$HOSTNAME_N')
+//	AND time >= '$HOUR_START'
+//	AND time < '$HOUR_END'
+//
 // GROUP BY minute
 // ORDER BY minute ASC
 //
@@ -83,7 +85,7 @@ type tsdbAggregateAllQuery struct {
 // single-groupby-5-1-12
 // single-groupby-5-1-1
 // single-groupby-5-8-1
-func (d *Devops) GroupByTime(qi query.Query, nhosts, numMetrics int, timeRange time.Duration) {
+func (d *Devops) GroupByTime(qi query.Query, nhosts, numMetrics int, timeRange time.Duration, zipNum int64, latestNum int64, newOrOld int) {
 	interval := d.Interval.MustRandWindow(timeRange)
 	hostnames, err := d.GetRandomHosts(nhosts)
 	if err != nil {
@@ -133,7 +135,7 @@ func (d *Devops) GroupByTime(qi query.Query, nhosts, numMetrics int, timeRange t
 // Resultsets:
 // high-cpu-1
 // high-cpu-all
-func (d *Devops) HighCPUForHosts(qi query.Query, nHosts int) {
+func (d *Devops) HighCPUForHosts(qi query.Query, nHosts int, zipNum int64, latestNum int64, newOrOld int) {
 	interval := d.Interval.MustRandWindow(devops.HighCPUDuration)
 	var hostnames []string
 	if nHosts > 0 {
@@ -176,16 +178,18 @@ func (d *Devops) HighCPUForHosts(qi query.Query, nHosts int) {
 // SELECT MAX(metric1), ..., MAX(metricN)
 // FROM cpu
 // WHERE
-// 		(hostname = '$HOSTNAME_1' OR ... OR hostname = '$HOSTNAME_N')
-// 		AND time >= '$HOUR_START'
-// 		AND time < '$HOUR_END'
+//
+//	(hostname = '$HOSTNAME_1' OR ... OR hostname = '$HOSTNAME_N')
+//	AND time >= '$HOUR_START'
+//	AND time < '$HOUR_END'
+//
 // GROUP BY hour
 // ORDER BY hour
 //
 // Resultsets:
 // cpu-max-all-1
 // cpu-max-all-8
-func (d *Devops) MaxAllCPU(qi query.Query, nHosts int) {
+func (d *Devops) MaxAllCPU(qi query.Query, nHosts int, zipNum int64, latestNum int64, newOrOld int) {
 	interval := d.Interval.MustRandWindow(devops.MaxAllDuration)
 	hostnames, err := d.GetRandomHosts(nHosts)
 	panicIfErr(err)
@@ -220,7 +224,7 @@ func (d *Devops) MaxAllCPU(qi query.Query, nHosts int) {
 }
 
 // LastPointPerHost finds the last row for every host in the dataset
-func (d *Devops) LastPointPerHost(qi query.Query) {
+func (d *Devops) LastPointPerHost(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 
 	var query tsdbAggregateAllQuery
 	query.Metrics = make(map[string]string)
@@ -254,7 +258,7 @@ func (d *Devops) LastPointPerHost(qi query.Query) {
 // double-groupby-1
 // double-groupby-5
 // double-groupby-all
-func (d *Devops) GroupByTimeAndPrimaryTag(qi query.Query, numMetrics int) {
+func (d *Devops) GroupByTimeAndPrimaryTag(qi query.Query, numMetrics int, zipNum int64, latestNum int64, newOrOld int) {
 	metrics, err := devops.GetCPUMetricsSlice(numMetrics)
 	panicIfErr(err)
 	interval := d.Interval.MustRandWindow(devops.DoubleGroupByDuration)
