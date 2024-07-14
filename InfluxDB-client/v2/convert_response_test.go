@@ -79,7 +79,8 @@ func TestByteArrayToResponseWithDatatype(t *testing.T) {
 	//}
 
 	if flagNum > 0 {
-		remainQueryString, minTime, maxTime := RemainQueryString(queryToBeSet, flagArr, timeRangeArr, tagArr)
+		queryTemplate, _, _, _ := GetQueryTemplate(queryToBeSet)
+		remainQueryString, minTime, maxTime := RemainQueryString(queryToBeSet, queryTemplate, flagArr, timeRangeArr, tagArr)
 		//fmt.Printf("remain query string:\n%s\n", remainQueryString)
 		//fmt.Printf("remain min time:\n%d\t%s\n", minTime, TimeInt64ToString(minTime))
 		//fmt.Printf("remain max time:\n%d\t%s\n", maxTime, TimeInt64ToString(maxTime))
@@ -195,7 +196,8 @@ func TestEmptyResponseToByteArray(t *testing.T) {
 	//}
 
 	if flagNum > 0 {
-		remainQueryString, minTime, maxTime := RemainQueryString(queryToBeSet, flagArr, timeRangeArr, tagArr)
+		queryTemplate, _, _, _ := GetQueryTemplate(queryToBeSet)
+		remainQueryString, minTime, maxTime := RemainQueryString(queryToBeSet, queryTemplate, flagArr, timeRangeArr, tagArr)
 		fmt.Printf("remain query string:\n%s\n", remainQueryString)
 		fmt.Printf("remain min time:\n%d\t%s\n", minTime, TimeInt64ToString(minTime))
 		fmt.Printf("remain max time:\n%d\t%s\n", maxTime, TimeInt64ToString(maxTime))
@@ -585,7 +587,8 @@ func TestRemainQueryString(t *testing.T) {
 	//}
 
 	if flagNum > 0 {
-		remainQueryString, minTime, maxTime := RemainQueryString(queryToBeSet, flagArr, timeRangeArr, tagArr)
+		queryTemplate, _, _, _ := GetQueryTemplate(queryToBeSet)
+		remainQueryString, minTime, maxTime := RemainQueryString(queryToBeSet, queryTemplate, flagArr, timeRangeArr, tagArr)
 		fmt.Printf("remain query string:\n%s\n", remainQueryString)
 		fmt.Printf("remain min time:\n%d\t%s\n", minTime, TimeInt64ToString(minTime))
 		fmt.Printf("remain max time:\n%d\t%s\n", maxTime, TimeInt64ToString(maxTime))

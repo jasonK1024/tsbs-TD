@@ -2,6 +2,7 @@ package influx
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,6 +27,23 @@ func NewIoT(start, end time.Time, scale int, g *BaseGenerator) *IoT {
 	}
 }
 
+// random tag
+func (i *IoT) getTruckWhereString(nTrucks int) string {
+	names, err := i.GetRandomTrucks(nTrucks)
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getTrucksWhereWithNames(names)
+}
+
+func (i *IoT) getTruckWhereStringAndTagString(metric string, nTrucks int) (string, string) {
+	names, err := i.GetRandomTrucks(nTrucks)
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getTrucksWhereWithNames(names), i.getTagStringWithNames(metric, names)
+}
+
 func (i *IoT) getTrucksWhereWithNames(names []string) string {
 	nameClauses := []string{}
 	for _, s := range names {
@@ -36,6 +54,34 @@ func (i *IoT) getTrucksWhereWithNames(names []string) string {
 	return "(" + combinedHostnameClause + ")"
 }
 
+func (i *IoT) getTagStringWithNames(metric string, names []string) string {
+	tagString := ""
+	tagString += "{"
+	slices.Sort(names)
+	for _, s := range names {
+		tagString += fmt.Sprintf("(%s.name=%s)", metric, s)
+	}
+	tagString += "}"
+	return tagString
+}
+
+// continuous tag
+func (i *IoT) getContinuousTruckWhereString() string {
+	names, err := i.GetContinuousRandomTrucks()
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getContinuousTrucksWhereWithNames(names)
+}
+
+func (i *IoT) getContinuousTruckWhereStringAndTagString(metric string) (string, string) {
+	names, err := i.GetContinuousRandomTrucks()
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getContinuousTrucksWhereWithNames(names), i.getTagStringWithNames(metric, names)
+}
+
 func (i *IoT) getContinuousTrucksWhereWithNames(names []string) string {
 	nameClauses := []string{}
 	for _, s := range names {
@@ -44,22 +90,6 @@ func (i *IoT) getContinuousTrucksWhereWithNames(names []string) string {
 
 	combinedHostnameClause := strings.Join(nameClauses, " or ")
 	return "(" + combinedHostnameClause + ")"
-}
-
-func (i *IoT) getTruckWhereString(nTrucks int) string {
-	names, err := i.GetRandomTrucks(nTrucks)
-	if err != nil {
-		panic(err.Error())
-	}
-	return i.getTrucksWhereWithNames(names)
-}
-
-func (i *IoT) getContinuousTruckWhereString() string {
-	names, err := i.GetContinuousRandomTrucks()
-	if err != nil {
-		panic(err.Error())
-	}
-	return i.getContinuousTrucksWhereWithNames(names)
 }
 
 // LastLocByTruck finds the truck location for nTrucks.
@@ -345,26 +375,6 @@ func tenMinutePeriods(minutesPerHour float64, duration time.Duration) int {
 var RandomTag bool = true
 var TagNum int = 10
 
-func (i *IoT) ReadingsVelocityPredicate(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
-	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
-	var influxql string
-
-	// todo
-	if !RandomTag {
-		influxql = fmt.Sprintf(
-			`SELECT velocity,fuel_consumption,grade FROM "readings" WHERE %s AND velocity > 90 AND fuel_consumption > 40 AND TIME >= '%s' AND TIME < '%s' GROUP BY "name"`,
-			i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-	} else {
-		influxql = fmt.Sprintf(
-			`SELECT velocity,fuel_consumption,grade FROM "readings" WHERE %s AND velocity > 90 AND fuel_consumption > 40 AND TIME >= '%s' AND TIME < '%s' GROUP BY "name"`,
-			i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-	}
-
-	humanLabel := "Influx ReadingsVelocity with Predicate IoT queries"
-	humanDesc := humanLabel
-	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
-}
-
 func (i *IoT) OnlyField1(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
@@ -497,27 +507,27 @@ func (i *IoT) ReadingsPosition(qi query.Query, zipNum int64, latestNum int64, ne
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	if !RandomTag {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		}
+	duration := ""
+	if zipNum < 5 {
+		duration = "5m"
 	} else {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		}
+		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(latitude),mean(longitude),mean(elevation) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(%s)`,
+		truckWhereString, interval.StartString(), interval.EndString(), duration)
+
+	influxql += ";"
+	influxql += fmt.Sprintf("%s#{latitude[float64],longitude[float64],elevation[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "Influx ReadingsPosition IoT queries"
 	humanDesc := humanLabel
@@ -528,27 +538,27 @@ func (i *IoT) ReadingsPosition2(qi query.Query, zipNum int64, latestNum int64, n
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	if !RandomTag {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		}
+	duration := ""
+	if zipNum < 5 {
+		duration = "5m"
 	} else {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		}
+		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(latitude),mean(longitude) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(%s)`,
+		truckWhereString, interval.StartString(), interval.EndString(), duration)
+
+	influxql += ";"
+	influxql += fmt.Sprintf("%s#{latitude[float64],longitude[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "Influx ReadingsPosition2 IoT queries"
 	humanDesc := humanLabel
@@ -559,28 +569,27 @@ func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, new
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	// todo
-	if !RandomTag {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		}
+	duration := ""
+	if zipNum < 5 {
+		duration = "5m"
 	} else {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		}
+		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("diagnostics")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+	}
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(current_load),mean(fuel_state) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(%s)`,
+		truckWhereString, interval.StartString(), interval.EndString(), duration)
+
+	influxql += ";"
+	influxql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "Influx DiagnosticsLoad IoT queries"
 	humanDesc := humanLabel
@@ -591,28 +600,27 @@ func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, new
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	// todo
-	if !RandomTag {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		}
+	duration := ""
+	if zipNum < 5 {
+		duration = "5m"
 	} else {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		}
+		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("diagnostics")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+	}
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(%s)`,
+		truckWhereString, interval.StartString(), interval.EndString(), duration)
+
+	influxql += ";"
+	influxql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64],fuel_capacity[float64],load_capacity[float64],nominal_fuel_consumption[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "Influx DiagnosticsLoad Five IoT queries"
 	humanDesc := humanLabel
@@ -623,28 +631,27 @@ func (i *IoT) ReadingsVelocityAndFuel(qi query.Query, zipNum int64, latestNum in
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	// todo
-	if !RandomTag {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		}
+	duration := ""
+	if zipNum < 5 {
+		duration = "5m"
 	} else {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		}
+		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(velocity),mean(fuel_consumption),mean(grade) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(%s)`,
+		truckWhereString, interval.StartString(), interval.EndString(), duration)
+
+	influxql += ";"
+	influxql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "Influx ReadingsVelocity IoT queries"
 	humanDesc := humanLabel
@@ -655,28 +662,27 @@ func (i *IoT) ReadingsVelocityAndFuel2(qi query.Query, zipNum int64, latestNum i
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	// todo
-	if !RandomTag {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		}
+	duration := ""
+	if zipNum < 5 {
+		duration = "5m"
 	} else {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		}
+		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(velocity),mean(fuel_consumption),mean(grade),mean(nominal_fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(%s)`,
+		truckWhereString, interval.StartString(), interval.EndString(), duration)
+
+	influxql += ";"
+	influxql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64],nominal_fuel_consumption[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "Influx ReadingsVelocity 2 IoT queries"
 	humanDesc := humanLabel
@@ -687,29 +693,53 @@ func (i *IoT) ReadingsAvgFuelConsumption(qi query.Query, zipNum int64, latestNum
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	if !RandomTag {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getContinuousTruckWhereString(), interval.StartString(), interval.EndString())
-		}
+	duration := ""
+	if zipNum < 5 {
+		duration = "5m"
 	} else {
-		if zipNum < 5 {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(5m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		} else {
-			influxql = fmt.Sprintf(
-				`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(15m)`,
-				i.getTruckWhereString(TagNum), interval.StartString(), interval.EndString())
-		}
+		duration = "15m"
 	}
 
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
+	influxql = fmt.Sprintf(
+		`SELECT mean(velocity),mean(fuel_consumption) FROM "readings" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(%s)`,
+		truckWhereString, interval.StartString(), interval.EndString(), duration)
+
+	influxql += ";"
+	influxql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64]}#{empty}#{mean,%s}", tagString, duration)
+
 	humanLabel := "Influx ReadingsAvgFuelConsumption IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
+}
+
+func (i *IoT) ReadingsVelocityPredicate(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	var influxql string
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
+	influxql = fmt.Sprintf(
+		`SELECT velocity,fuel_consumption,grade FROM "readings" WHERE %s AND velocity > 90 AND fuel_consumption > 40 AND TIME >= '%s' AND TIME < '%s' GROUP BY "name"`,
+		truckWhereString, interval.StartString(), interval.EndString())
+
+	influxql += ";"
+	influxql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64]}#{(velocity>90[int64])(fuel_consumption>40[int64])}#{empty,empty}", tagString)
+
+	humanLabel := "Influx ReadingsVelocity with Predicate IoT queries"
 	humanDesc := humanLabel
 	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
 }

@@ -236,8 +236,9 @@ func ByteArrayToFloat64(byteArray []byte) (float64, error) {
 func QueryResultToString(data *async.ExecResult) string {
 	var result string
 
-	for _, colName := range data.Header.ColNames {
-		result += fmt.Sprintf("%s\t", colName)
+	colTypes := ColumnDataType(data.Header.ColTypes)
+	for i, colName := range data.Header.ColNames {
+		result += fmt.Sprintf("%s[%s]\t", colName, colTypes[i])
 	}
 	result += "\n"
 

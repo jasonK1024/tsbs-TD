@@ -617,3 +617,18 @@ func GetTotalSegment(metric string, tags []string, partialSegment string) string
 
 	return result
 }
+
+func SplitPartialSegment(semanticSegment string) (string, string, string) {
+	firstIdx := strings.Index(semanticSegment, "#")
+	tagString := semanticSegment[:firstIdx]
+	partialSegment := semanticSegment[firstIdx:]
+
+	secondIdx := strings.Index(partialSegment[1:], "#")
+	fields := partialSegment[2:secondIdx]
+
+	mStartIdx := strings.Index(tagString, "(")
+	mEndIdx := strings.Index(tagString, ".")
+	metric := tagString[mStartIdx+1 : mEndIdx]
+
+	return partialSegment, fields, metric
+}

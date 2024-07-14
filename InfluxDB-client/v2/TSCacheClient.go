@@ -96,7 +96,7 @@ func TSCacheClient(conn Client, queryString string) (*Response, uint64, uint8) {
 		} else { // 部分命中，剩余查询
 			hitKind = 1
 
-			remainQueryString, minTime, maxTime := RemainQueryString(queryString, flagArr, timeRangeArr, tagArr)
+			remainQueryString, minTime, maxTime := RemainQueryString(queryString, queryTemplate, flagArr, timeRangeArr, tagArr)
 
 			// tagArr 是要查询的所有 tag ，remainTags 是部分命中的 tag
 			remainTags := make([]string, 0)

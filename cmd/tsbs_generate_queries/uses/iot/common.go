@@ -78,6 +78,10 @@ func (c *Core) GetRandomTrucks(nTrucks int) ([]string, error) {
 	return getRandomTrucks(nTrucks, c.Scale)
 }
 
+func (c *Core) GetTDRandomTrucks(metric string, nTrucks int) ([]string, error) {
+	return getTDRandomTrucks(metric, nTrucks, c.Scale)
+}
+
 func (c *Core) GetContinuousRandomTrucks() ([]string, error) {
 	return getContinuousRandomTrucks()
 }
@@ -101,6 +105,28 @@ func getRandomTrucks(numTrucks int, totalTrucks int) ([]string, error) {
 	truckNames := []string{}
 	for _, n := range randomNumbers {
 		truckNames = append(truckNames, fmt.Sprintf("truck_%d", n))
+	}
+
+	return truckNames, nil
+}
+
+func getTDRandomTrucks(metric string, numTrucks int, totalTrucks int) ([]string, error) {
+	if numTrucks < 1 {
+		return nil, fmt.Errorf("number of trucks cannot be < 1; got %d", numTrucks)
+	}
+	if numTrucks > totalTrucks {
+		return nil, fmt.Errorf("number of trucks (%d) larger than total trucks. See --scale (%d)", numTrucks, totalTrucks)
+	}
+
+	randomNumbers, err := common.GetRandomSubsetPerm(numTrucks, totalTrucks)
+	if err != nil {
+		return nil, err
+	}
+
+	truckNames := []string{}
+	m := metric[0:1]
+	for _, n := range randomNumbers {
+		truckNames = append(truckNames, fmt.Sprintf("%s_truck_%d", m, n))
 	}
 
 	return truckNames, nil

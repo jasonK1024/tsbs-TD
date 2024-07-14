@@ -902,6 +902,11 @@ func TestNewGetSegment(t *testing.T) {
 			totalSegment := GetTotalSegment(metric, tags, partialSegment)
 			fmt.Println("total segment: ", totalSegment)
 
+			partialSegment, fields, metric = SplitPartialSegment(totalSegment)
+			fmt.Println("split partial segment: ", partialSegment)
+			fmt.Println("split fields: ", fields)
+			fmt.Println("split metric: ", metric)
+
 			//if strings.Compare(ss, tt.expected) != 0 {
 			//	t.Errorf("samantic segment:\t%s", ss)
 			//	t.Errorf("expected:\t%s", tt.expected)

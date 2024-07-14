@@ -18,6 +18,8 @@ import (
 	"github.com/taosdata/tsbs/pkg/targets/tdengine/commonpool"
 )
 
+var totalRowLength int64 = 0
+
 var (
 	user   string
 	pass   string
@@ -73,6 +75,8 @@ func init() {
 }
 func main() {
 	runner.Run(&query.TDenginePool, newProcessor)
+
+	fmt.Println("\navg row num per query result: ", totalRowLength/200000)
 }
 
 type queryExecutorOptions struct {
@@ -88,16 +92,31 @@ type processor struct {
 
 func (p *processor) Init(workerNum int) {
 	async.Init()
-	db, err := commonpool.GetConnection(user, pass, host, port)
-	if err != nil {
-		panic(err)
+	//db, err := commonpool.GetConnection(user, pass, host, port)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//dbName := runner.DatabaseName()
+	//err = async.GlobalAsync.TaosExecWithoutResult(db.TaosConnection, "use "+dbName)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//p.db = db
+
+	splitHosts := strings.Split(host, ",")
+	for i := range DBConns {
+		db, err := commonpool.GetConnection(user, pass, splitHosts[i], port)
+		if err != nil {
+			panic(err)
+		}
+		dbName := runner.DatabaseName()
+		err = async.GlobalAsync.TaosExecWithoutResult(db.TaosConnection, "use "+dbName)
+		if err != nil {
+			panic(err)
+		}
+		p.db = db
 	}
-	dbName := runner.DatabaseName()
-	err = async.GlobalAsync.TaosExecWithoutResult(db.TaosConnection, "use "+dbName)
-	if err != nil {
-		panic(err)
-	}
-	p.db = db
+
 	p.opts = &queryExecutorOptions{
 		debug:         runner.DebugLevel() > 0,
 		printResponse: runner.DoPrintResponses(),
@@ -113,30 +132,46 @@ func (p *processor) ProcessQuery(q query.Query, _ bool) ([]*query.Stat, error) {
 	if p.opts.debug {
 		fmt.Println(qry)
 	}
-	querys := strings.Split(qry, ";")
-	if len(querys) > 1 {
-		var preQuerys []string
-		for i := 0; i < len(querys); i++ {
-			if len(querys[i]) > 0 {
-				preQuerys = append(preQuerys, querys[i])
-			}
-		}
-		if len(preQuerys) > 1 {
-			for i := 0; i < len(preQuerys)-1; i++ {
-				err := async.GlobalAsync.TaosExecWithoutResult(p.db.TaosConnection, preQuerys[i])
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-		qry = querys[len(preQuerys)-1]
-	}
+	// todo
+	//querys := strings.Split(qry, ";")
+	//if len(querys) > 1 {
+	//	var preQuerys []string
+	//	for i := 0; i < len(querys); i++ {
+	//		if len(querys[i]) > 0 {
+	//			preQuerys = append(preQuerys, querys[i])
+	//		}
+	//	}
+	//	if len(preQuerys) > 1 {
+	//		for i := 0; i < len(preQuerys)-1; i++ {
+	//			//err := async.GlobalAsync.TaosExecWithoutResult(p.db.TaosConnection, preQuerys[i])
+	//			err := async.GlobalAsync.TaosExecWithoutResult(DBConns[p.workerNum%len(DBConns)], preQuerys[i])
+	//			if err != nil {
+	//				return nil, err
+	//			}
+	//		}
+	//	}
+	//	qry = querys[len(preQuerys)-1]
+	//}
 	//data, err := async.GlobalAsync.TaosExec(p.db.TaosConnection, qry, func(ts int64, precision int) driver.Value {
 	//	return ts
 	//})
-	data, err := async.GlobalAsync.TaosExec(DBConns[p.workerNum%len(DBConns)], qry, func(ts int64, precision int) driver.Value {
+	//fmt.Printf("workerNum: %d  len(DBConns): %d \n", p.workerNum, len(DBConns))
+
+	sss := strings.Split(qry, ";")
+	queryString := sss[0]
+	segment := ""
+	if len(sss) == 2 {
+		segment = sss[1]
+	}
+	segment += ""
+
+	//fmt.Println("\tSql: ", queryString)
+	//fmt.Println("\tSegment: ", segment)
+
+	data, err := async.GlobalAsync.TaosExec(DBConns[p.workerNum%len(DBConns)], queryString, func(ts int64, precision int) driver.Value {
 		return ts
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +181,8 @@ func (p *processor) ProcessQuery(q query.Query, _ bool) ([]*query.Stat, error) {
 	}
 	took := float64(time.Since(start).Nanoseconds()) / 1e6
 	stat := query.GetStat()
+
+	totalRowLength += int64(len(data.Data))
 
 	//stat.Init(q.HumanLabelName(), took, byteLength, hitKind)
 	stat.InitWithParam(q.HumanLabelName(), took, 0, 0)

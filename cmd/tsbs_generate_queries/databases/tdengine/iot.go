@@ -2,6 +2,7 @@ package tdengine
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -22,20 +23,67 @@ type IoT struct {
 //avg-daily-driving-duration
 //daily-activity
 
-func (i *IoT) getTrucksWhereWithNames(names []string) string {
-	var nameClauses []string
+// random tag
+func (i *IoT) getTruckWhereString(nTrucks int) string {
+	names, err := i.GetRandomTrucks(nTrucks)
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getTrucksWhereWithNames(names)
+}
 
+func (i *IoT) getTruckWhereStringAndTagString(metric string, nTrucks int) (string, string) {
+	names, err := i.GetTDRandomTrucks(metric, nTrucks)
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getTrucksWhereWithNames(names), i.getTagStringWithNames(metric, names)
+}
+
+func (i *IoT) getTrucksWhereWithNames(names []string) string {
+	nameClauses := []string{}
 	for _, s := range names {
 		nameClauses = append(nameClauses, fmt.Sprintf("'%s'", s))
 	}
-	return fmt.Sprintf("name IN (%s)", strings.Join(nameClauses, ","))
+	return fmt.Sprintf("tbname IN (%s)", strings.Join(nameClauses, ","))
 }
 
-// getHostWhereString gets multiple random hostnames and creates a WHERE SQL statement for these hostnames.
-func (i *IoT) getTruckWhereString(nTrucks int) string {
-	names, err := i.GetRandomTrucks(nTrucks)
-	panicIfErr(err)
-	return i.getTrucksWhereWithNames(names)
+func (i *IoT) getTagStringWithNames(metric string, names []string) string {
+	tagString := ""
+	tagString += "{"
+	slices.Sort(names)
+	for _, s := range names {
+		tagString += fmt.Sprintf("(%s.name=%s)", metric, s)
+	}
+	tagString += "}"
+	return tagString
+}
+
+// continuous tag
+func (i *IoT) getContinuousTruckWhereString() string {
+	names, err := i.GetContinuousRandomTrucks()
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getContinuousTrucksWhereWithNames(names)
+}
+
+func (i *IoT) getContinuousTruckWhereStringAndTagString(metric string) (string, string) {
+	names, err := i.GetContinuousRandomTrucks()
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getContinuousTrucksWhereWithNames(names), i.getTagStringWithNames(metric, names)
+}
+
+func (i *IoT) getContinuousTrucksWhereWithNames(names []string) string {
+	nameClauses := []string{}
+	for _, s := range names {
+		nameClauses = append(nameClauses, fmt.Sprintf("\"name\" = '%s'", s))
+	}
+
+	combinedHostnameClause := strings.Join(nameClauses, " or ")
+	return "(" + combinedHostnameClause + ")"
 }
 
 // LastLocByTruck finds the truck location for nTrucks.
@@ -197,9 +245,20 @@ func (i *IoT) ReadingsVelocityPredicate(qi query.Query, zipNum int64, latestNum 
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	sql := ""
 
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
 	sql = fmt.Sprintf(
-		`SELECT _wstart as ts,tbname,velocity,fuel_consumption,grade FROM readings WHERE %s AND velocity > 90 AND fuel_consumption > 40 AND ts >= %d AND ts < %d  partition by tbname order by tbname`,
-		i.getTruckWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis())
+		`SELECT _wstart as ts,tbname,velocity,fuel_consumption,grade FROM readings WHERE %s AND velocity > 90 AND fuel_consumption > 40 AND ts >= %d AND ts < %d  partition by tbname order by tbname,ts`,
+		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis())
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64]}#{(velocity>90[int64])(fuel_consumption>40[int64])}#{empty,empty}", tagString)
 
 	humanLabel := "TDengine ReadingsVelocity with Predicate IoT queries"
 	humanDesc := humanLabel
@@ -216,9 +275,21 @@ func (i *IoT) ReadingsPosition(qi query.Query, zipNum int64, latestNum int64, ne
 	} else {
 		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
 	sql = fmt.Sprintf(
-		`SELECT _wstart as ts,tbname,avg(latitude),avg(longitude),avg(elevation) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname`,
-		i.getTruckWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+		`SELECT _wstart as ts,tbname,avg(latitude),avg(longitude),avg(elevation) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
+		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{latitude[float64],longitude[float64],elevation[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "TDengine ReadingsPosition IoT queries"
 	humanDesc := humanLabel
@@ -235,9 +306,21 @@ func (i *IoT) ReadingsPosition2(qi query.Query, zipNum int64, latestNum int64, n
 	} else {
 		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
 	sql = fmt.Sprintf(
-		`SELECT _wstart as ts,tbname,avg(latitude),avg(longitude) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname`,
-		i.getTruckWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+		`SELECT _wstart as ts,tbname,avg(latitude),avg(longitude) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
+		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{latitude[float64],longitude[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "TDengine ReadingsPosition 2 IoT queries"
 	humanDesc := humanLabel
@@ -254,9 +337,21 @@ func (i *IoT) ReadingsVelocityAndFuel(qi query.Query, zipNum int64, latestNum in
 	} else {
 		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
 	sql = fmt.Sprintf(
-		`SELECT _wstart as ts,tbname,avg(velocity),avg(fuel_consumption),avg(grade) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname`,
-		i.getTruckWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+		`SELECT _wstart as ts,tbname,avg(velocity),avg(fuel_consumption),avg(grade) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
+		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "TDengine ReadingsVelocity IoT queries"
 	humanDesc := humanLabel
@@ -273,9 +368,21 @@ func (i *IoT) ReadingsVelocityAndFuel2(qi query.Query, zipNum int64, latestNum i
 	} else {
 		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
 	sql = fmt.Sprintf(
-		`SELECT _wstart as ts,tbname,avg(velocity),avg(fuel_consumption),avg(grade),avg(nominal_fuel_consumption) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname`,
-		i.getTruckWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+		`SELECT _wstart as ts,tbname,avg(velocity),avg(fuel_consumption),avg(grade),avg(nominal_fuel_consumption) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
+		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64],nominal_fuel_consumption[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "TDengine ReadingsVelocity 2 IoT queries"
 	humanDesc := humanLabel
@@ -292,9 +399,21 @@ func (i *IoT) ReadingsAvgFuelConsumption(qi query.Query, zipNum int64, latestNum
 	} else {
 		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	}
+
 	sql = fmt.Sprintf(
-		`SELECT _wstart as ts,tbname,avg(velocity),avg(fuel_consumption) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname`,
-		i.getTruckWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+		`SELECT _wstart as ts,tbname,avg(velocity),avg(fuel_consumption) FROM readings WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
+		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "TDengine ReadingsAvgFuelConsumption IoT queries"
 	humanDesc := humanLabel
@@ -311,9 +430,21 @@ func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, new
 	} else {
 		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("diagnostics")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+	}
+
 	sql = fmt.Sprintf(
-		`SELECT _wstart as ts,tbname,avg(current_load),avg(fuel_state) FROM diagnostics WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname`,
-		i.getTruckWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+		`SELECT _wstart as ts,tbname,avg(current_load),avg(fuel_state) FROM diagnostics WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
+		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "TDengine DiagnosticsLoad IoT queries"
 	humanDesc := humanLabel
@@ -330,9 +461,21 @@ func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, new
 	} else {
 		duration = "15m"
 	}
+
+	truckWhereString := ""
+	tagString := ""
+	if !RandomTag {
+		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("diagnostics")
+	} else {
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+	}
+
 	sql = fmt.Sprintf(
 		`SELECT _wstart as ts,tbname,avg(current_load),avg(fuel_state),avg(fuel_capacity),avg(load_capacity),avg(nominal_fuel_consumption) FROM diagnostics WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname`,
-		i.getTruckWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64],fuel_capacity[float64],load_capacity[float64],nominal_fuel_consumption[float64]}#{empty}#{mean,%s}", tagString, duration)
 
 	humanLabel := "TDengine DiagnosticsLoad Five IoT queries"
 	humanDesc := humanLabel

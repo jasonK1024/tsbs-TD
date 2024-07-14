@@ -839,7 +839,7 @@ func ByteArrayToResponse(byteArray []byte) (*Response, int, []uint8, [][]int64, 
 }
 
 // RemainQueryString 根据 cache 返回结果中的时间范围构造一个剩余查询语句
-func RemainQueryString(queryString string, flagArr []uint8, timeRangeArr [][]int64, tagArr [][]string) (string, int64, int64) {
+func RemainQueryString(queryString string, queryTemplate string, flagArr []uint8, timeRangeArr [][]int64, tagArr [][]string) (string, int64, int64) {
 	//if len(flagArr) == 0 || len(timeRangeArr) == 0 || len(tagArr) == 0 {
 	//	return "", 0, 0
 	//}
@@ -851,11 +851,11 @@ func RemainQueryString(queryString string, flagArr []uint8, timeRangeArr [][]int
 	var minTime int64 = math.MaxInt64
 
 	if len(tagArr) == 0 {
-		template, _, _, _ := GetQueryTemplate(queryString)
+		//template, _, _, _ := GetQueryTemplate(queryString)
 		minTime = timeRangeArr[0][0]
 		maxTime = timeRangeArr[0][1]
 
-		tmpTemplate := template
+		tmpTemplate := queryTemplate
 		startTime := TimeInt64ToString(timeRangeArr[0][0])
 		endTime := TimeInt64ToString(timeRangeArr[0][1])
 		tmpTemplate = strings.Replace(tmpTemplate, "?", startTime, 1)
@@ -879,7 +879,7 @@ func RemainQueryString(queryString string, flagArr []uint8, timeRangeArr [][]int
 	matchStr = `(?i)GROUP BY .+(time\(.+\))`
 	conditionExpr = regexp.MustCompile(matchStr)
 	if ok, _ := regexp.MatchString(matchStr, queryString); !ok {
-		template, _, _, _ := GetQueryTemplate(queryString)
+		//template, _, _, _ := GetQueryTemplate(queryString)
 		minTime = timeRangeArr[0][0]
 		maxTime = timeRangeArr[0][1]
 
@@ -892,7 +892,7 @@ func RemainQueryString(queryString string, flagArr []uint8, timeRangeArr [][]int
 				if maxTime < timeRangeArr[i][1] {
 					maxTime = timeRangeArr[i][1]
 				}
-				tmpTemplate := template
+				tmpTemplate := queryTemplate
 				startTime := TimeInt64ToString(timeRangeArr[i][0])
 				endTime := TimeInt64ToString(timeRangeArr[i][1])
 

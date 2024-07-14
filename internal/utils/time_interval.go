@@ -125,7 +125,8 @@ func (ti *TimeInterval) DistributionRandWithOldData(zipNum int64, latestNum int6
 		//fmt.Printf("start time:\t%d\tend time:\t%d\n", totalStartTime, totalEndTime)
 		//fmt.Printf("start time:\t%s\tend time:\t%s\n", client.NanoTimeInt64ToString(totalStartTime), client.NanoTimeInt64ToString(totalEndTime))
 
-		queryEndTime := totalEndTime - ((time.Hour.Nanoseconds() * 12) * (365*2 - latestNum - 1)) // Latest分布生成结束时间
+		//queryEndTime := totalEndTime - ((time.Hour.Nanoseconds() * 12) * (365*2 - latestNum - 1)) // Latest分布生成结束时间
+		queryEndTime := totalEndTime - ((time.Hour.Nanoseconds() * 3) * (365*2*4 - latestNum - 1))
 		queryStartTime := queryEndTime - duration
 		//fmt.Printf("start time:\t%s\tend time:\t%s\n", client.NanoTimeInt64ToString(queryStartTime), client.NanoTimeInt64ToString(queryEndTime))
 		if queryStartTime < totalStartTime {
@@ -150,7 +151,8 @@ func (ti *TimeInterval) DistributionRandWithOldData(zipNum int64, latestNum int6
 		totalStartTime := ti.start.UnixNano()
 		totalEndTime := totalStartTime + time.Hour.Nanoseconds()*24*90
 
-		queryEndTime := totalEndTime - ((time.Hour.Nanoseconds() * 12) * (90*2 - latestNum - 1)) // Latest分布生成结束时间
+		//queryEndTime := totalEndTime - ((time.Hour.Nanoseconds() * 12) * (90*2 - latestNum - 1)) // Latest分布生成结束时间
+		queryEndTime := totalEndTime - ((time.Hour.Nanoseconds() * 3) * (90*2*4 - latestNum - 1))
 		queryStartTime := queryEndTime - duration
 		if queryStartTime < totalStartTime {
 			queryStartTime = totalStartTime

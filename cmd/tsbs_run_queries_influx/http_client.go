@@ -75,21 +75,44 @@ func (w *HTTPClient) Do(q *query.HTTP, opts *HTTPClientDoOptions, workerNum int)
 
 	var resp *influxdb_client.Response
 
+	//_, _, _, tags := influxdb_client.GetQueryTemplate(string(q.RawQuery))
+	//partialSegment, _, metric := influxdb_client.GetPartialSegmentAndFields(string(q.RawQuery))
+	//semanticSegment := influxdb_client.GetTotalSegment(metric, tags, partialSegment)
+	//fmt.Printf("\t%s\n%s\n", string(q.RawQuery), semanticSegment)
+
 	// Perform the request while tracking latency:
+
+	sss := strings.Split(string(q.RawQuery), ";")
+	queryString := sss[0]
+	segment := ""
+	if len(sss) == 2 {
+		segment = sss[1]
+	}
+	segment += ""
+	//fmt.Println("\tSql: ", queryString)
+	//fmt.Println("\tSegment: ", segment)
+
 	start := time.Now() // 发送请求之前的时间
 
 	//log.Println(string(q.RawQuery))
 	if strings.EqualFold(influxdb_client.UseCache, "stscache") {
+		//
+		//_, byteLength, hitKind = influxdb_client.STsCacheClient(DBConn[workerNum%len(DBConn)], string(q.RawQuery))
 
-		_, byteLength, hitKind = influxdb_client.STsCacheClient(DBConn[workerNum%len(DBConn)], string(q.RawQuery))
+		if len(sss) == 1 {
+			_, byteLength, hitKind = influxdb_client.STsCacheClient(DBConn[workerNum%len(DBConn)], queryString)
+		} else {
+			//fmt.Println("seg")
+			_, byteLength, hitKind = influxdb_client.STsCacheClientSeg(DBConn[workerNum%len(DBConn)], queryString, segment)
+		}
 
 	} else if strings.EqualFold(influxdb_client.UseCache, "tscache") {
 
-		_, byteLength, hitKind = influxdb_client.TSCacheClient(DBConn[workerNum%len(DBConn)], string(q.RawQuery))
+		_, byteLength, hitKind = influxdb_client.TSCacheClient(DBConn[workerNum%len(DBConn)], queryString)
 
 	} else { // database
 
-		qry := influxdb_client.NewQuery(string(q.RawQuery), influxdb_client.DB, "s")
+		qry := influxdb_client.NewQuery(queryString, influxdb_client.DB, "s")
 		//resp, err := DBConn[workerNum%len(DBConn)].Query(qry)
 		resp, err = DBConn[workerNum%len(DBConn)].Query(qry)
 		if err != nil {
