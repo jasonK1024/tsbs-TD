@@ -15,7 +15,7 @@ const (
 )
 
 var DB = "devops_small"
-var DbName = ""
+var DbName = "influxdb"
 
 var TaosConnection, _ = wrapper.TaosConnect(host, user, pass, DB, port)
 
@@ -37,13 +37,9 @@ const STRINGBYTELENGTH = 32
 
 var CacheHash = make(map[string]int)
 
-//var CacheHashMtx sync.Mutex
-
 // GetCacheHashValue 根据 fields 选择不同的 cache
 func GetCacheHashValue(fields string) int {
-	//CacheHashMtx.Lock()
 	CacheNum := len(STsConnArr)
-
 	if CacheNum == 0 {
 		CacheNum = 1
 	}
@@ -52,7 +48,6 @@ func GetCacheHashValue(fields string) int {
 		CacheHash[fields] = value
 	}
 	hashValue := CacheHash[fields]
-	// CacheHashMtx.Unlock()
 	return hashValue
 }
 

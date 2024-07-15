@@ -34,6 +34,35 @@ func TestTDengineTagQuery(t *testing.T) {
 	fmt.Println("data Header Column Length: ", data.Header.ColLength)
 	fmt.Println("data Data: ", data.Data)
 
-	fmt.Println(QueryResultToString(data))
+	fmt.Println(ResultToString(data))
+
+}
+
+func TestTDengineRemainQuery(t *testing.T) {
+	queryString := `SELECT _wstart AS ts, hostname, avg(usage_user), avg(usage_guest) FROM cpu WHERE hostname = 'host_1' AND ts >= '2022-01-01 08:02:00.000' AND ts < '2022-01-01 08:10:00.000' partition by hostname interval(1m) UNION ALL SELECT _wstart AS ts, hostname, avg(usage_user), avg(usage_guest) FROM cpu WHERE hostname = 'host_45' AND ts >= '2022-01-01 08:05:00.000' AND ts < '2022-01-01 08:11:00.000' partition by hostname interval(1m) UNION ALL SELECT _wstart AS ts, hostname, avg(usage_user), avg(usage_guest) FROM cpu WHERE hostname = 'host_21' AND ts >= '2022-01-01 08:02:00.000' AND ts < '2022-01-01 08:04:00.000'  partition by hostname interval(1m) order by hostname,ts;`
+
+	host := "192.168.1.101"
+	user := "root"
+	pass := "taosdata"
+	db := "devops_small"
+	port := 6030
+	TaosConnection, err := wrapper.TaosConnect(host, user, pass, db, port)
+	if err != nil {
+		log.Fatal("TDengine connection fail: ", err)
+	}
+	async.Init()
+
+	data, err := async.GlobalAsync.TaosExec(TaosConnection, queryString, func(ts int64, precision int) driver.Value {
+		return ts
+	})
+
+	fmt.Println("data field count: ", data.FieldCount)
+	fmt.Println("data AffectedRows: ", data.AffectedRows)
+	fmt.Println("data Header Column Types: ", data.Header.ColTypes)
+	fmt.Println("data Header Column Names: ", data.Header.ColNames)
+	fmt.Println("data Header Column Length: ", data.Header.ColLength)
+	fmt.Println("data Data: ", data.Data)
+
+	fmt.Println(ResultToString(data))
 
 }
