@@ -471,7 +471,7 @@ func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, new
 	}
 
 	sql = fmt.Sprintf(
-		`SELECT _wstart as ts,tbname,avg(current_load),avg(fuel_state),avg(fuel_capacity),avg(load_capacity),avg(nominal_fuel_consumption) FROM diagnostics WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname`,
+		`SELECT _wstart as ts,tbname,avg(current_load),avg(fuel_state),avg(fuel_capacity),avg(load_capacity),avg(nominal_fuel_consumption) FROM diagnostics WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
 		truckWhereString, interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
 
 	sql += ";"

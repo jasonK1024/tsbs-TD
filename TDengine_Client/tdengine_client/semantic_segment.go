@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+func GetStarSegment(metric, partialSegment string) string {
+
+	result := fmt.Sprintf("{(%s.*)}%s", metric, partialSegment)
+
+	return result
+}
+
 func GetSingleSegment(metric, partialSegment string, tags []string) []string {
 	result := make([]string, 0)
 

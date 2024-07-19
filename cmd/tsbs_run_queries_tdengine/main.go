@@ -127,8 +127,22 @@ func (p *processor) Init(workerNum int) {
 func (p *processor) ProcessQuery(q query.Query, _ bool) ([]*query.Stat, error) {
 	tq := q.(*query.TDengine)
 
-	start := time.Now()
+	var _ []*async.ExecResult
+	byteLength := uint64(0)
+	hitKind := uint8(0)
+
 	qry := string(tq.SqlQuery)
+	// 拆分SQL和语义段
+	sss := strings.Split(qry, ";")
+	queryString := sss[0]
+	segment := ""
+	if len(sss) == 2 {
+		segment = sss[1]
+	}
+	segment += ""
+
+	start := time.Now()
+
 	if p.opts.debug {
 		fmt.Println(qry)
 	}
@@ -157,36 +171,38 @@ func (p *processor) ProcessQuery(q query.Query, _ bool) ([]*query.Stat, error) {
 	//})
 	//fmt.Printf("workerNum: %d  len(DBConns): %d \n", p.workerNum, len(DBConns))
 
-	sss := strings.Split(qry, ";")
-	queryString := sss[0]
-	segment := ""
-	if len(sss) == 2 {
-		segment = sss[1]
-	}
-	segment += ""
+	if strings.EqualFold(tdengine_client.UseCache, "stscache") {
+		_, byteLength, hitKind = tdengine_client.STsCacheClientSeg(DBConns[p.workerNum%len(DBConns)], queryString, segment)
+		//intervalLen := 0
+		//for _, data := range results {
+		//	totalRowLength += int64(len(data.Data))
+		//	intervalLen += len(data.Data)
+		//}
+		if p.opts.printResponse {
+			//fmt.Println("data row length: ", intervalLen)
+		}
+	} else {
+		data, err := async.GlobalAsync.TaosExec(DBConns[p.workerNum%len(DBConns)], queryString, func(ts int64, precision int) driver.Value {
+			return ts
+		})
 
-	//fmt.Println("\tSql: ", queryString)
-	//fmt.Println("\tSegment: ", segment)
-
-	data, err := async.GlobalAsync.TaosExec(DBConns[p.workerNum%len(DBConns)], queryString, func(ts int64, precision int) driver.Value {
-		return ts
-	})
-
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+		if p.opts.printResponse {
+			//fmt.Printf("%#v\n", data)
+			fmt.Println("data row length: ", len(data.Data))
+		}
+		totalRowLength += int64(len(data.Data))
 	}
-	if p.opts.printResponse {
-		//fmt.Printf("%#v\n", data)
-		fmt.Println("data row length: ", len(data.Data))
-	}
+
 	took := float64(time.Since(start).Nanoseconds()) / 1e6
 	stat := query.GetStat()
 
-	totalRowLength += int64(len(data.Data))
-
 	//stat.Init(q.HumanLabelName(), took, byteLength, hitKind)
-	stat.InitWithParam(q.HumanLabelName(), took, 0, 0)
+	stat.InitWithParam(q.HumanLabelName(), took, byteLength, hitKind)
 
+	var err error
 	return []*query.Stat{stat}, err
 }
 

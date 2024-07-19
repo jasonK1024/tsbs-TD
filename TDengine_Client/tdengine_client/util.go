@@ -35,7 +35,7 @@ const (
 )
 
 func ResponseIsEmpty(data *async.ExecResult) bool {
-	return len(data.Data) == 0 || data.FieldCount == 0 || len(data.Header.ColTypes) == 0 || len(data.Header.ColNames) == 0 || len(data.Header.ColLength) == 0
+	return data == nil || len(data.Data) == 0 || data.FieldCount == 0 || len(data.Header.ColTypes) == 0 || len(data.Header.ColNames) == 0 || len(data.Header.ColLength) == 0
 }
 
 // GetQueryTemplate 取出时间范围和 tag，替换为查询模版
@@ -88,6 +88,8 @@ func GetQueryTemplate(queryString string) (string, int64, int64, []string) {
 		tags[i] = name + tags[i]
 	}
 
+	startTime /= 1000
+	endTime /= 1000
 	return result, startTime, endTime, tags
 }
 

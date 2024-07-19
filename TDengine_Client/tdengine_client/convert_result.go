@@ -86,6 +86,7 @@ func ByteArrayToResponseWithDatatype(byteArray []byte, datatypes []string) ([]*a
 				if err != nil {
 					log.Fatal(err)
 				}
+				startTime *= 1000
 				singleTimeRange[0] = startTime
 
 				stimeStartIdx := index // 索引指向第一个时间戳
@@ -96,6 +97,7 @@ func ByteArrayToResponseWithDatatype(byteArray []byte, datatypes []string) ([]*a
 				if err != nil {
 					log.Fatal(err)
 				}
+				endTime *= 1000
 				singleTimeRange[1] = endTime
 
 				//fmt.Printf("%d %d\n", startTime, endTime)
@@ -125,14 +127,27 @@ func ByteArrayToResponseWithDatatype(byteArray []byte, datatypes []string) ([]*a
 		/* 根据数据类型转换每行数据*/
 		bytesPerLine := BytesPerLine(datatypes) // 每行字节数
 		lines := int(curLen) / bytesPerLine     // 数据行数
+		sttIdx := strings.Index(curSeg, "=")
+		endIdx := strings.Index(curSeg, ")")
+		//if sttIdx < 0 || endIdx < 0 {
+		//	fmt.Println("byteArray: ", string(byteArray[17000:17200]))
+		//	fmt.Println("curSeg: ", curSeg)
+		//	fmt.Println("curLen: ", curLen)
+		//	fmt.Println("byte array len: ", len(byteArray))
+		//	fmt.Println("seprateSemanticSegments length: ", len(seprateSemanticSegments))
+		//	fmt.Println("seprateSemanticSegment: ", seprateSemanticSegments)
+		//}
+		tag := curSeg[sttIdx+1 : endIdx]
+		avg := strings.Contains(strings.ToLower(curSeg), "mean")
 		values = nil
 		for len(values) < lines { // 按行读取一张表中的所有数据
 			value = nil
 			for i, d := range datatypes { // 每次处理一行, 遍历一行中的所有列
 				if i == 1 {
+					value = append(value, tag)
 					continue
 				}
-				if i > 1 && datatypes[i] == "int64" {
+				if avg && i > 1 && datatypes[i] == "int64" {
 					d = "float64"
 				}
 				switch d { // 根据每列的数据类型选择转换方法
@@ -160,6 +175,9 @@ func ByteArrayToResponseWithDatatype(byteArray []byte, datatypes []string) ([]*a
 					tmp, err := ByteArrayToInt64(byteArray[iStartIdx:iEndIdx])
 					if err != nil {
 						log.Fatal(err)
+					}
+					if i == 0 {
+						tmp *= 1000
 					}
 					value = append(value, tmp)
 					break
@@ -302,7 +320,7 @@ func ResponseToByteArrayWithParams(resp *async.ExecResult, datatypes []string, t
 				continue
 			}
 			datatype := datatypes[j]
-			if j > 1 && datatype == "int64" {
+			if strings.Contains(partialSegment, "mean") && j > 1 && datatype == "int64" {
 				datatype = "float64"
 			}
 			tmpBytes := InterfaceToByteArray(j, datatype, v)
@@ -319,6 +337,61 @@ func ResponseToByteArrayWithParams(resp *async.ExecResult, datatypes []string, t
 	segIdx++
 
 	return result, int64(segIdx)
+}
+
+func RemainResponseToByteArrayWithParams(resp *async.ExecResult, datatypes []string, tags []string, metric string, partialSegment string) ([]byte, int64, map[string][][]driver.Value) {
+	result := make([]byte, 0)
+	dataBytes := make([]byte, 0)
+
+	subTable := make(map[string][][]driver.Value)
+
+	if ResponseIsEmpty(resp) {
+		return nil, 0, nil
+	}
+
+	singleSegments := GetSingleSegment(metric, partialSegment, tags)
+
+	bytesPerLine := BytesPerLine(datatypes)
+	for _, row := range resp.Data {
+		tag := row[1].(string)
+		if _, ok := subTable[tag]; !ok {
+			subTable[tag] = make([][]driver.Value, 0)
+		}
+		subTable[tag] = append(subTable[tag], row)
+	}
+
+	for _, seg := range singleSegments {
+		sIdx := strings.Index(seg, "=")
+		eIdx := strings.Index(seg, ")")
+		tag := seg[sIdx+1 : eIdx]
+		values := subTable[tag]
+		bytesPerSeries, _ := Int64ToByteArray(int64(bytesPerLine * len(values)))
+
+		/* 存入一张表的 semantic segment 和表内所有数据的总字节数 */
+		result = append(result, []byte(seg)...)
+		result = append(result, []byte(" ")...)
+		result = append(result, bytesPerSeries...)
+		result = append(result, dataBytes...)
+
+		mean := strings.Contains(partialSegment, "mean")
+		for _, row := range values {
+			/* 数据转换成字节数组，存入 */
+			for j, v := range row {
+				if j == 1 { // 不传入 tag 列
+					continue
+				}
+				datatype := datatypes[j]
+				if mean && j > 1 && datatype == "int64" {
+					datatype = "float64"
+				}
+				tmpBytes := InterfaceToByteArray(j, datatype, v)
+				dataBytes = append(dataBytes, tmpBytes...)
+			}
+		}
+
+	}
+
+	return result, int64(len(singleSegments)), subTable
 }
 
 func InterfaceToByteArray(index int, datatype string, value interface{}) []byte {
@@ -348,6 +421,9 @@ func InterfaceToByteArray(index int, datatype string, value interface{}) []byte 
 		if value != nil {
 			if reflect.ValueOf(value).CanInt() {
 				tmpInt := reflect.ValueOf(value).Int()
+				if index == 0 {
+					tmpInt /= 1000
+				}
 				iBytes, err := Int64ToByteArray(tmpInt)
 				if err != nil {
 					log.Fatal(fmt.Errorf(err.Error()))
@@ -537,6 +613,10 @@ func ByteArrayToFloat64(byteArray []byte) (float64, error) {
 func ResultToString(data *async.ExecResult) string {
 	var result string
 
+	if ResponseIsEmpty(data) {
+		return "empty response"
+	}
+
 	colTypes := DataTypeFromColumn(data.Header.ColTypes)
 	for i, colName := range data.Header.ColNames {
 		result += fmt.Sprintf("%s[%s]\t", colName, colTypes[i])
@@ -544,10 +624,11 @@ func ResultToString(data *async.ExecResult) string {
 	result += "\n"
 
 	for _, row := range data.Data {
-		for _, col := range row {
+		for j, col := range row {
 			if col == nil {
 				result += "-"
-			} else if str, ok := col.(string); ok {
+			} else if colTypes[j] == "string" {
+				str := col.(string)
 				result += str
 			} else if reflect.ValueOf(col).CanInt() {
 				tmpInt := reflect.ValueOf(col).Int()
@@ -557,8 +638,9 @@ func ResultToString(data *async.ExecResult) string {
 				tmpFloat := reflect.ValueOf(col).Float()
 				str := strconv.FormatFloat(tmpFloat, 'g', -1, 64)
 				result += str
-			} else if b, ok := col.(bool); ok {
-				if b {
+			} else if colTypes[j] == "bool" {
+				str := ""
+				if reflect.ValueOf(col).Bool() {
 					str = "1"
 				} else {
 					str = "0"
