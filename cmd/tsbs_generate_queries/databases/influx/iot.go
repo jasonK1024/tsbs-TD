@@ -600,13 +600,6 @@ func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, new
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	duration := ""
-	if zipNum < 5 {
-		duration = "5m"
-	} else {
-		duration = "15m"
-	}
-
 	truckWhereString := ""
 	tagString := ""
 	if !RandomTag {
@@ -616,11 +609,11 @@ func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, new
 	}
 
 	influxql = fmt.Sprintf(
-		`SELECT mean(current_load),mean(fuel_state),mean(fuel_capacity),mean(load_capacity),mean(nominal_fuel_consumption) FROM "diagnostics" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "name",time(%s)`,
-		truckWhereString, interval.StartString(), interval.EndString(), duration)
+		`SELECT current_load,fuel_state FROM "diagnostics" WHERE %s AND fuel_state > 0.9 AND current_load > 4500 AND TIME >= '%s' AND TIME < '%s' GROUP BY "name"`,
+		truckWhereString, interval.StartString(), interval.EndString())
 
 	influxql += ";"
-	influxql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64],fuel_capacity[float64],load_capacity[float64],nominal_fuel_consumption[float64]}#{empty}#{mean,%s}", tagString, duration)
+	influxql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64]}#{(fuel_state>0.9[float64])(current_load>4500[int64])}#{empty,empty}", tagString)
 
 	humanLabel := "Influx DiagnosticsLoad Five IoT queries"
 	humanDesc := humanLabel

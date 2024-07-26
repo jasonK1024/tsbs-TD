@@ -11,6 +11,9 @@ import (
 
 const goTimeFmt = "2006-01-02 15:04:05.999999 -0700"
 
+var RandomTag bool = true
+var TagNum int = 10
+
 // BaseGenerator contains settings specific for TimescaleDB
 type BaseGenerator struct {
 	UseJSON       bool

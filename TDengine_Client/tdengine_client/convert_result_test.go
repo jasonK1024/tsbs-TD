@@ -9,7 +9,6 @@ import (
 	"github.com/taosdata/tsbs/TDengine_Client/stscache_client"
 	"github.com/taosdata/tsbs/pkg/targets/tdengine/async"
 	"log"
-	"strings"
 	"testing"
 )
 
@@ -49,117 +48,6 @@ func TestByteArrayToBool(t *testing.T) {
 		}
 	}
 
-}
-
-func TestStringToByteArray(t *testing.T) {
-	tests := []struct {
-		name     string
-		str      string
-		expected []byte
-	}{
-		{
-			name:     "empty",
-			str:      "",
-			expected: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		},
-		{
-			name:     "normal",
-			str:      "SCHEMA ",
-			expected: []byte{83, 67, 72, 69, 77, 65, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		},
-		{
-			name:     "white spaces",
-			str:      "          ",
-			expected: []byte{32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		}, {
-			name:     "CRLF",
-			str:      "a\r\ns\r\nd\r\n",
-			expected: []byte{97, 13, 10, 115, 13, 10, 100, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		}, {
-			name:     "normal2",
-			str:      "asd zxc",
-			expected: []byte{97, 115, 100, 32, 122, 120, 99, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		},
-		{
-			name:     "symbols",
-			str:      "-=.,/\\][()!@#$%^&*?\":",
-			expected: []byte{45, 61, 46, 44, 47, 92, 93, 91, 40, 41, 33, 64, 35, 36, 37, 94, 38, 42, 63, 34, 58, 0, 0, 0, 0},
-		},
-		{
-			name:     "length out of range(25)",
-			str:      "AaaaBbbbCcccDdddEeeeFfffGggg",
-			expected: []byte{65, 97, 97, 97, 66, 98, 98, 98, 67, 99, 99, 99, 68, 100, 100, 100, 69, 101, 101, 101, 70, 102, 102, 102, 71},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			byteArray := StringToByteArray(tt.str)
-
-			if !bytes.Equal(byteArray, tt.expected) {
-				t.Errorf("byte array:%d", byteArray)
-				t.Errorf("expected:%b", tt.expected)
-			}
-
-			//fmt.Printf("expected:%d\n", tt.expected)
-		})
-	}
-
-}
-
-func TestByteArrayToString(t *testing.T) {
-	tests := []struct {
-		name      string
-		expected  string
-		byteArray []byte
-	}{
-		{
-			name:      "empty",
-			expected:  "",
-			byteArray: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		},
-		{
-			name:      "normal",
-			expected:  "SCHEMA ",
-			byteArray: []byte{83, 67, 72, 69, 77, 65, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		},
-		{
-			name:      "white spaces",
-			expected:  "          ",
-			byteArray: []byte{32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		}, {
-			name:      "CRLF",
-			expected:  "a\r\ns\r\nd\r\n",
-			byteArray: []byte{97, 13, 10, 115, 13, 10, 100, 13, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		}, {
-			name:      "normal2",
-			expected:  "asd zxc",
-			byteArray: []byte{97, 115, 100, 32, 122, 120, 99, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		},
-		{
-			name:      "symbols",
-			expected:  "-=.,/\\][()!@#$%^&*?\":",
-			byteArray: []byte{45, 61, 46, 44, 47, 92, 93, 91, 40, 41, 33, 64, 35, 36, 37, 94, 38, 42, 63, 34, 58, 0, 0, 0, 0},
-		},
-		{
-			name:      "length out of range(25)",
-			expected:  "AaaaBbbbCcccDdddEeeeFfffG",
-			byteArray: []byte{65, 97, 97, 97, 66, 98, 98, 98, 67, 99, 99, 99, 68, 100, 100, 100, 69, 101, 101, 101, 70, 102, 102, 102, 71},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			str := ByteArrayToString(tt.byteArray)
-
-			if strings.Compare(str, tt.expected) != 0 {
-				t.Errorf("string:%s", str)
-				t.Errorf("expected:%s", tt.expected)
-			}
-
-			fmt.Printf("string:%s\n", str)
-		})
-	}
 }
 
 func TestInt64ToByteArray(t *testing.T) {

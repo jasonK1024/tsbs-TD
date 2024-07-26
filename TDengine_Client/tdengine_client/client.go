@@ -21,7 +21,7 @@ const (
 )
 
 var DB = "devops_small"
-var DbName = "influxdb"
+var DbName = ""
 
 var TaosConnection, _ = wrapper.TaosConnect(host, user, pass, DB, port)
 

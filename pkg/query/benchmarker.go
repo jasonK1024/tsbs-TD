@@ -6,6 +6,7 @@ import (
 	"fmt"
 	influxdb_client "github.com/taosdata/tsbs/InfluxDB-client/v2"
 	"github.com/taosdata/tsbs/TDengine_Client/tdengine_client"
+	"github.com/taosdata/tsbs/TimescaleDB_Client/timescaledb_client"
 	"io/ioutil"
 	"log"
 	"os"
@@ -98,7 +99,7 @@ func NewBenchmarkRunner(config BenchmarkRunnerConfig) *BenchmarkRunner {
 		tdengine_client.STsCacheURL = config.CacheURL
 		STsCacheURLArr := strings.Split(tdengine_client.STsCacheURL, ",")
 		tdengine_client.STsConnArr = tdengine_client.InitStsConnsArr(STsCacheURLArr)
-	} else {
+	} else if strings.EqualFold(influxdb_client.DbName, "influxdb") {
 		// todo cache启动参数
 		influxdb_client.DB = config.DBName
 
@@ -106,6 +107,14 @@ func NewBenchmarkRunner(config BenchmarkRunnerConfig) *BenchmarkRunner {
 		influxdb_client.STsCacheURL = config.CacheURL
 		STsCacheURLArr := strings.Split(influxdb_client.STsCacheURL, ",")
 		influxdb_client.STsConnArr = influxdb_client.InitStsConnsArr(STsCacheURLArr)
+	} else if strings.EqualFold(timescaledb_client.DbName, "timescaledb") {
+		// todo cache启动参数
+		timescaledb_client.DB = config.DBName
+
+		timescaledb_client.UseCache = config.UseCache
+		timescaledb_client.STsCacheURL = config.CacheURL
+		STsCacheURLArr := strings.Split(timescaledb_client.STsCacheURL, ",")
+		timescaledb_client.STsConnArr = timescaledb_client.InitStsConnsArr(STsCacheURLArr)
 	}
 
 	runner.sp = newStatProcessor(spArgs)

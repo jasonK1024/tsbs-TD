@@ -2,6 +2,7 @@ package timescaledb
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -43,12 +44,12 @@ func (i *IoT) withAlias(column string) string {
 
 func (i *IoT) getTrucksWhereWithNames(names []string) string {
 	nameClauses := []string{}
-	if i.UseJSON {
-		for _, s := range names {
-			nameClauses = append(nameClauses, fmt.Sprintf("tagset @> '{\"name\": \"%s\"}'", s))
-		}
-		return fmt.Sprintf("tags_id IN (SELECT id FROM tags WHERE %s)", strings.Join(nameClauses, " OR "))
-	}
+	//if i.UseJSON {
+	//	for _, s := range names {
+	//		nameClauses = append(nameClauses, fmt.Sprintf("tagset @> '{\"name\": \"%s\"}'", s))
+	//	}
+	//	return fmt.Sprintf("tags_id IN (SELECT id FROM tags WHERE %s)", strings.Join(nameClauses, " OR "))
+	//}
 
 	for _, s := range names {
 		nameClauses = append(nameClauses, fmt.Sprintf("'%s'", s))
@@ -61,6 +62,25 @@ func (i *IoT) getTruckWhereString(nTrucks int) string {
 	names, err := i.GetRandomTrucks(nTrucks)
 	panicIfErr(err)
 	return i.getTrucksWhereWithNames(names)
+}
+
+func (i *IoT) getTruckWhereStringAndTagString(metric string, nTrucks int) (string, string) {
+	names, err := i.GetRandomTrucks(nTrucks)
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getTrucksWhereWithNames(names), i.getTagStringWithNames(metric, names)
+}
+
+func (i *IoT) getTagStringWithNames(metric string, names []string) string {
+	tagString := ""
+	tagString += "{"
+	slices.Sort(names)
+	for _, s := range names {
+		tagString += fmt.Sprintf("(%s.name=%s)", metric, s)
+	}
+	tagString += "}"
+	return tagString
 }
 
 // LastLocByTruck finds the truck location for nTrucks.
@@ -431,4 +451,254 @@ func tenMinutePeriods(minutesPerHour float64, duration time.Duration) int {
 	durationMinutes := duration.Minutes()
 	leftover := minutesPerHour * duration.Hours()
 	return int((durationMinutes - leftover) / 10)
+}
+
+// New Queries
+func (i *IoT) ReadingsPosition(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := 0
+	if zipNum < 5 {
+		duration = 5
+	} else {
+		duration = 15
+	}
+
+	truckWhereString := ""
+	tagString := ""
+
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT time_bucket('%d minute', time) as bucket,name,avg(latitude),avg(longitude),avg(elevation) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
+		duration, truckWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{latitude[float64],longitude[float64],elevation[float64]}#{empty}#{mean,%dm}", tagString, duration)
+
+	humanLabel := "TimeScaleDB ReadingsPosition IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, iot.ReadingsTableName, sql)
+}
+
+func (i *IoT) ReadingsPosition2(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := 0
+	if zipNum < 5 {
+		duration = 5
+	} else {
+		duration = 15
+	}
+
+	truckWhereString := ""
+	tagString := ""
+
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT time_bucket('%d minute', time) as bucket,name,avg(latitude),avg(longitude) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
+		duration, truckWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{latitude[float64],longitude[float64]}#{empty}#{mean,%dm}", tagString, duration)
+
+	humanLabel := "TimeScaleDB ReadingsPosition 2 IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, iot.ReadingsTableName, sql)
+}
+
+func (i *IoT) ReadingsVelocityAndFuel(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := 0
+	if zipNum < 5 {
+		duration = 5
+	} else {
+		duration = 15
+	}
+
+	truckWhereString := ""
+	tagString := ""
+
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT time_bucket('%d minute', time) as bucket,name,avg(velocity),avg(fuel_consumption),avg(grade) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
+		duration, truckWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64]}#{empty}#{mean,%dm}", tagString, duration)
+
+	humanLabel := "TimeScaleDB ReadingsVelocity IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, iot.ReadingsTableName, sql)
+}
+
+func (i *IoT) ReadingsVelocityAndFuel2(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := 0
+	if zipNum < 5 {
+		duration = 5
+	} else {
+		duration = 15
+	}
+
+	truckWhereString := ""
+	tagString := ""
+
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT time_bucket('%d minute', time) as bucket,name,avg(velocity),avg(fuel_consumption),avg(grade),avg(heading) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
+		duration, truckWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64],heading[float64]}#{empty}#{mean,%dm}", tagString, duration)
+
+	humanLabel := "TimeScaleDB ReadingsVelocity 2 IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, iot.ReadingsTableName, sql)
+}
+
+func (i *IoT) ReadingsAvgFuelConsumption(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := 0
+	if zipNum < 5 {
+		duration = 5
+	} else {
+		duration = 15
+	}
+
+	truckWhereString := ""
+	tagString := ""
+
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT time_bucket('%d minute', time) as bucket,name,avg(velocity),avg(fuel_consumption) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
+		duration, truckWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64]}#{empty}#{mean,%dm}", tagString, duration)
+
+	humanLabel := "TimeScaleDB ReadingsAvgFuelConsumption IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, iot.ReadingsTableName, sql)
+}
+
+func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := 0
+	if zipNum < 5 {
+		duration = 5
+	} else {
+		duration = 15
+	}
+
+	truckWhereString := ""
+	tagString := ""
+
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT time_bucket('%d minute', time) as bucket,name,avg(current_load),avg(fuel_state) FROM diagnostics WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
+		duration, truckWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64]}#{empty}#{mean,%dm}", tagString, duration)
+
+	humanLabel := "TimeScaleDB DiagnosticsLoad IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, iot.DiagnosticsTableName, sql)
+}
+
+func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	truckWhereString := ""
+	tagString := ""
+
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT time as bucket,name,current_load,fuel_state FROM diagnostics WHERE %s AND time >= '%s' AND time < '%s' AND fuel_state > 0.9 AND current_load > 4500 ORDER BY name,bucket`,
+		truckWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64]}#{(fuel_state>0.9[float64])(current_load>4500[int64])}#{empty,empty}", tagString)
+
+	humanLabel := "TimeScaleDB DiagnosticsLoad Five IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, iot.DiagnosticsTableName, sql)
+}
+
+// todo Predicate
+func (i *IoT) ReadingsVelocityPredicate(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	truckWhereString := ""
+	tagString := ""
+
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT time as bucket,name,velocity,fuel_consumption,grade FROM readings WHERE %s AND time >= '%s' AND time < '%s' AND velocity > 90 AND fuel_consumption > 40 ORDER BY name,bucket`,
+		truckWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64]}#{(velocity>90[int64])(fuel_consumption>40[int64])}#{empty,empty}", tagString)
+
+	humanLabel := "TimeScaleDB ReadingsVelocity with Predicate IoT queries"
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, iot.ReadingsTableName, sql)
+}
+
+var index = 0
+
+func (i *IoT) IoTQueries(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+
+	switch index % 8 {
+	case 0:
+		i.ReadingsPosition(qi, zipNum, latestNum, newOrOld)
+		break
+	case 1:
+		i.ReadingsPosition2(qi, zipNum, latestNum, newOrOld)
+		break
+	case 2:
+		i.DiagnosticsLoad(qi, zipNum, latestNum, newOrOld)
+		break
+	case 3:
+		i.ReadingsVelocityAndFuel(qi, zipNum, latestNum, newOrOld)
+		break
+	case 4:
+		i.ReadingsAvgFuelConsumption(qi, zipNum, latestNum, newOrOld)
+		break
+	case 5:
+		i.DiagnosticsFive(qi, zipNum, latestNum, newOrOld)
+		break
+	case 6:
+		i.ReadingsVelocityAndFuel2(qi, zipNum, latestNum, newOrOld)
+		break
+	case 7:
+		i.ReadingsVelocityPredicate(qi, zipNum, latestNum, newOrOld)
+		break
+	default:
+		i.ReadingsPosition(qi, zipNum, latestNum, newOrOld)
+		break
+	}
+
+	//fmt.Printf("number:\t%d\n", index)
+	index++
 }

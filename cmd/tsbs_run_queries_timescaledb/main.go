@@ -9,17 +9,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"strings"
-	"time"
-
 	"github.com/blagojts/viper"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+	"github.com/taosdata/tsbs/TimescaleDB_Client/timescaledb_client"
 	"github.com/taosdata/tsbs/internal/utils"
 	"github.com/taosdata/tsbs/pkg/query"
+	"regexp"
+	"strings"
+	"time"
 )
 
 const pgxDriver = "pgx" // default driver
@@ -34,6 +34,12 @@ var (
 	port            string
 	showExplain     bool
 	forceTextFormat bool
+)
+
+var totalRowLength int64 = 0
+var (
+	daemonUrls []string
+	DBConns    []*sql.DB
 )
 
 // Global vars:
@@ -57,6 +63,8 @@ func init() {
 	pflag.Bool("show-explain", false, "Print out the EXPLAIN output for sample query")
 	pflag.Bool("force-text-format", false, "Send/receive data in text format")
 
+	pflag.String("db", "", "tdengine or influxdb or timescaledb")
+
 	pflag.Parse()
 
 	err := utils.SetupConfigFile()
@@ -77,8 +85,6 @@ func init() {
 	showExplain = viper.GetBool("show-explain")
 	forceTextFormat = viper.GetBool("force-text-format")
 
-	runner = query.NewBenchmarkRunner(config)
-
 	if showExplain {
 		runner.SetLimit(1)
 	}
@@ -93,10 +99,23 @@ func init() {
 	for _, host := range strings.Split(hosts, ",") {
 		hostList = append(hostList, host)
 	}
+
+	timescaledb_client.DB = viper.GetString("db-name")
+	timescaledb_client.DbName = viper.GetString("db")
+
+	runner = query.NewBenchmarkRunner(config)
+
+	// todo	多数据库
+	DBConns = make([]*sql.DB, len(hostList))
+	for i := range hostList {
+		DBConns[i], _ = sql.Open(driver, getConnectString(i))
+	}
 }
 
 func main() {
 	runner.Run(&query.TimescaleDBPool, newProcessor)
+
+	fmt.Println("\navg row num per query result: ", totalRowLength/200000)
 }
 
 // Get the connection string for a connection to PostgreSQL.
@@ -174,8 +193,9 @@ type queryExecutorOptions struct {
 }
 
 type processor struct {
-	db   *sql.DB
-	opts *queryExecutorOptions
+	db        *sql.DB
+	opts      *queryExecutorOptions
+	workerNum int
 }
 
 func newProcessor() query.Processor { return &processor{} }
@@ -191,6 +211,7 @@ func (p *processor) Init(workerNumber int) {
 		debug:         runner.DebugLevel() > 0,
 		printResponse: runner.DoPrintResponses(),
 	}
+	p.workerNum = workerNumber
 }
 
 func (p *processor) ProcessQuery(q query.Query, isWarm bool) ([]*query.Stat, error) {
@@ -200,42 +221,90 @@ func (p *processor) ProcessQuery(q query.Query, isWarm bool) ([]*query.Stat, err
 	}
 	tq := q.(*query.TimescaleDB)
 
-	start := time.Now()
+	byteLength := uint64(0)
+	hitKind := uint8(0)
+
 	qry := string(tq.SqlQuery)
-	if showExplain {
-		qry = "EXPLAIN ANALYZE " + qry
+	// 拆分SQL和语义段
+	sss := strings.Split(qry, ";")
+	queryString := sss[0]
+	segment := ""
+	if len(sss) == 2 {
+		segment = sss[1]
 	}
-	rows, err := p.db.Query(qry)
-	if err != nil {
-		return nil, err
+	//segment += ""
+
+	start := time.Now()
+
+	//if p.opts.debug {
+	//	fmt.Println(qry)
+	//}
+
+	if strings.EqualFold(timescaledb_client.UseCache, "stscache") {
+		_, byteLength, hitKind = timescaledb_client.STsCacheClientSeg(DBConns[p.workerNum%len(DBConns)], queryString, segment)
+
+		//intervalLen := 0
+		//for _, data := range results {
+		//	totalRowLength += int64(len(data.Data))
+		//	intervalLen += len(data.Data)
+		//}
+		//if p.opts.printResponse {
+		//fmt.Println("data row length: ", intervalLen)
+		//}
+	} else {
+		rows, err := DBConns[p.workerNum%len(DBConns)].Query(queryString)
+
+		intervalLen := 0
+		if err != nil {
+			return nil, err
+		}
+		if p.opts.printResponse {
+			for rows.Next() {
+				intervalLen++
+			}
+			fmt.Println("data row length: ", intervalLen)
+		}
+		totalRowLength += int64(intervalLen)
+		for rows.Next() {
+		}
+		rows.Close()
 	}
 
-	if p.opts.debug {
-		fmt.Println(qry)
-	}
-	if showExplain {
-		text := ""
-		for rows.Next() {
-			var s string
-			if err2 := rows.Scan(&s); err2 != nil {
-				panic(err2)
-			}
-			text += s + "\n"
-		}
-		fmt.Printf("%s\n\n%s\n-----\n\n", qry, text)
-	} else if p.opts.printResponse {
-		prettyPrintResponse(rows, tq)
-	}
+	//if showExplain {
+	//	qry = "EXPLAIN ANALYZE " + qry
+	//}
+	//rows, err := p.db.Query(qry)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//
+	//if showExplain {
+	//	text := ""
+	//	for rows.Next() {
+	//		var s string
+	//		if err2 := rows.Scan(&s); err2 != nil {
+	//			panic(err2)
+	//		}
+	//		text += s + "\n"
+	//	}
+	//	fmt.Printf("%s\n\n%s\n-----\n\n", qry, text)
+	//} else if p.opts.printResponse {
+	//	prettyPrintResponse(rows, tq)
+	//}
 	// Fetching all the rows to confirm that the query is fully completed.
-	for rows.Next() {
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
+
+	//if err := rows.Err(); err != nil {
+	//	return nil, err
+	//}
+
 	took := float64(time.Since(start).Nanoseconds()) / 1e6
 	stat := query.GetStat()
-	stat.Init(q.HumanLabelName(), took)
+	//stat.Init(q.HumanLabelName(), took)
+	stat.InitWithParam(q.HumanLabelName(), took, byteLength, hitKind)
 
+	//fmt.Println("hitKind: ", hitKind)
+
+	var err error
 	return []*query.Stat{stat}, err
 }

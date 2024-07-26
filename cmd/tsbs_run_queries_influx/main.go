@@ -99,7 +99,10 @@ func (p *processor) Init(workerNumber int) {
 	p.workerNum = workerNumber
 }
 
-func (p *processor) ProcessQuery(q query.Query, _ bool) ([]*query.Stat, error) {
+func (p *processor) ProcessQuery(q query.Query, isWarm bool) ([]*query.Stat, error) {
+	if isWarm {
+		return nil, nil
+	}
 	hq := q.(*query.HTTP)
 
 	//println(string(hq.Path))

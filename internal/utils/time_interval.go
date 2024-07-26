@@ -120,7 +120,7 @@ func (ti *TimeInterval) DistributionRandWithOldData(zipNum int64, latestNum int6
 
 	if newOrOld == 0 {
 		totalStartTime := ti.start.UnixNano()
-		totalEndTime := ti.end.UnixNano() - 1
+		totalEndTime := ti.end.UnixNano() - time.Second.Nanoseconds()
 		//fmt.Println(ti.end)
 		//fmt.Printf("start time:\t%d\tend time:\t%d\n", totalStartTime, totalEndTime)
 		//fmt.Printf("start time:\t%s\tend time:\t%s\n", client.NanoTimeInt64ToString(totalStartTime), client.NanoTimeInt64ToString(totalEndTime))
