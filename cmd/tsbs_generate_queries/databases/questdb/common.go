@@ -3,6 +3,7 @@ package questdb
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/taosdata/tsbs/cmd/tsbs_generate_queries/uses/devops"
@@ -14,6 +15,9 @@ import (
 type BaseGenerator struct {
 }
 
+//var RandomTag bool = true
+//var TagNum int = 10
+
 // GenerateEmptyQuery returns an empty query.QuestDB.
 func (g *BaseGenerator) GenerateEmptyQuery() query.Query {
 	return query.NewHTTP()
@@ -21,6 +25,9 @@ func (g *BaseGenerator) GenerateEmptyQuery() query.Query {
 
 // fillInQuery fills the query struct with data.
 func (g *BaseGenerator) fillInQuery(qi query.Query, humanLabel, humanDesc, sql string) {
+	sss := strings.Split(sql, ";")
+	sql = sss[0]
+
 	v := url.Values{}
 	v.Set("count", "false")
 	v.Set("query", sql)

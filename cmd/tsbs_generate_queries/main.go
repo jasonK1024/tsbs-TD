@@ -4,7 +4,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/taosdata/tsbs/cmd/tsbs_generate_queries/databases/tdengine"
 	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"github.com/taosdata/tsbs/pkg/query/config"
 	"os"
@@ -111,8 +110,10 @@ func init() {
 	common.Ratio[0] = n1
 	common.Ratio[1] = n2
 
-	tdengine.RandomTag = viper.GetBool("random-tag")
-	tdengine.TagNum = viper.GetInt("tag-num")
+	common.RandomTag = viper.GetBool("random-tag")
+	common.TagNum = viper.GetInt("tag-num")
+	//tdengine.RandomTag = viper.GetBool("random-tag")
+	//tdengine.TagNum = viper.GetInt("tag-num")
 }
 
 func main() {

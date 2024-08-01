@@ -2,6 +2,7 @@ package influx
 
 import (
 	"fmt"
+	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"slices"
 	"strings"
 	"time"
@@ -179,7 +180,7 @@ func (d *Devops) SimpleCPU(qi query.Query, zipNum int64, latestNum int64, newOrO
 
 	influxql = fmt.Sprintf(
 		`SELECT mean(usage_nice),mean(usage_steal),mean(usage_guest) FROM "cpu" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "hostname",time(%s)`,
-		d.getHostWhereString(TagNum), interval.StartString(), interval.EndString(), duration)
+		d.getHostWhereString(common.TagNum), interval.StartString(), interval.EndString(), duration)
 
 	humanLabel := "Influx Simple CPU"
 	humanDesc := humanLabel
@@ -197,7 +198,7 @@ func (d *Devops) ThreeField3(qi query.Query, zipNum int64, latestNum int64, newO
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	influxql = fmt.Sprintf(
 		`SELECT mean(usage_system),mean(usage_idle),mean(usage_nice) FROM "cpu" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "hostname",time(%s)`,
@@ -222,7 +223,7 @@ func (d *Devops) FiveField1(qi query.Query, zipNum int64, latestNum int64, newOr
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	influxql = fmt.Sprintf(
 		`SELECT mean(usage_user),mean(usage_system),mean(usage_idle),mean(usage_nice),mean(usage_iowait) FROM "cpu" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "hostname",time(%s)`,
@@ -247,7 +248,7 @@ func (d *Devops) ThreeField(qi query.Query, zipNum int64, latestNum int64, newOr
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	influxql = fmt.Sprintf(
 		`SELECT mean(usage_user),mean(usage_system),mean(usage_idle) FROM "cpu" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "hostname",time(%s)`,
@@ -272,7 +273,7 @@ func (d *Devops) ThreeField2(qi query.Query, zipNum int64, latestNum int64, newO
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	influxql = fmt.Sprintf(
 		`SELECT mean(usage_idle),mean(usage_nice),mean(usage_iowait) FROM "cpu" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "hostname",time(%s)`,
@@ -297,7 +298,7 @@ func (d *Devops) TenField(qi query.Query, zipNum int64, latestNum int64, newOrOl
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	influxql = fmt.Sprintf(
 		`SELECT mean(usage_user),mean(usage_system),mean(usage_idle),mean(usage_nice),mean(usage_iowait),mean(usage_irq),mean(usage_softirq),mean(usage_steal),mean(usage_guest),mean(usage_guest_nice) FROM "cpu" WHERE %s AND TIME >= '%s' AND TIME < '%s' GROUP BY "hostname",time(%s)`,
@@ -315,7 +316,7 @@ func (d *Devops) TenFieldWithPredicate(qi query.Query, zipNum int64, latestNum i
 	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	influxql = fmt.Sprintf(
 		`SELECT usage_user,usage_system,usage_idle,usage_nice,usage_iowait,usage_irq,usage_softirq,usage_steal,usage_guest,usage_guest_nice FROM "cpu" WHERE %s AND usage_user > 90 AND usage_guest > 90 AND TIME >= '%s' AND TIME < '%s' GROUP BY "hostname"`,

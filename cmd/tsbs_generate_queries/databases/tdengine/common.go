@@ -9,8 +9,8 @@ import (
 	"github.com/taosdata/tsbs/pkg/query"
 )
 
-var RandomTag bool = true
-var TagNum int = 10
+//var RandomTag bool = true
+//var TagNum int = 10
 
 // BaseGenerator contains settings specific for Influx database.
 type BaseGenerator struct {

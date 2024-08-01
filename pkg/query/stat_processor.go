@@ -220,12 +220,15 @@ func (sp *defaultStatProcessor) process(workers uint) {
 
 	for stat := range sp.c {
 		atomic.AddUint64(&sp.opsCount, 1)
-		atomic.AddUint64(&sp.totalByteLength, stat.byteLength)
-		if stat.hitKind == 2 {
-			atomic.AddUint64(&sp.totalFullyGetNum, 1)
-		} else if stat.hitKind == 1 {
-			atomic.AddUint64(&sp.totalPartialGetNum, 1)
+		if i > sp.args.burnIn {
+			atomic.AddUint64(&sp.totalByteLength, stat.byteLength)
+			if stat.hitKind == 2 {
+				atomic.AddUint64(&sp.totalFullyGetNum, 1)
+			} else if stat.hitKind == 1 {
+				atomic.AddUint64(&sp.totalPartialGetNum, 1)
+			}
 		}
+
 		if i < sp.args.burnIn {
 			i++
 			statPool.Put(stat)
@@ -235,6 +238,10 @@ func (sp *defaultStatProcessor) process(workers uint) {
 			if err != nil {
 				log.Fatal(err)
 			}
+
+			sp.startTime = time.Now()
+			prevTime = sp.startTime
+			prevRequestCount = sp.args.burnIn
 		}
 		if _, ok := sp.statMapping[string(stat.label)]; !ok {
 			sp.statMapping[string(stat.label)] = newStatGroup(*sp.args.limit)
@@ -275,7 +282,9 @@ func (sp *defaultStatProcessor) process(workers uint) {
 			//overallBandWidth := float64(sp.totalByteLength) / float64(sinceStart.Seconds())
 
 			intervalQueryRate := float64(sp.opsCount-prevRequestCount) / float64(took.Seconds())
-			overallQueryRate := float64(sp.opsCount) / float64(sinceStart.Seconds())
+			overallQueryRate := float64(sp.opsCount-sp.args.burnIn) / float64(sinceStart.Seconds())
+			//intervalQueryRate := float64(sp.opsCount-prevRequestCount) / float64(took.Seconds())
+			//overallQueryRate := float64(sp.opsCount) / float64(sinceStart.Seconds())
 			//_, err := fmt.Fprintf(os.Stderr, "After %d queries with %d workers:\nInterval query rate: %0.2f queries/sec\tOverall query rate: %0.2f queries/sec\n",
 			//	i-sp.args.burnIn,
 			//	workers,
@@ -342,6 +351,7 @@ func (sp *defaultStatProcessor) process(workers uint) {
 	}
 	sinceStart := time.Now().Sub(sp.startTime)
 	overallQueryRate := float64(sp.opsCount) / float64(sinceStart.Seconds())
+	//overallQueryRate := float64(sp.opsCount-sp.args.burnIn) / float64(sp.totalTime.Seconds())
 	overallFullyGetNum := sp.totalFullyGetNum
 	overallPartiallyGetNum := sp.totalPartialGetNum
 	overallFullyGetRate := float64(sp.totalFullyGetNum) / float64(i-sp.args.burnIn)

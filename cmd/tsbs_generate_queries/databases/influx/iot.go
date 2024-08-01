@@ -2,6 +2,7 @@ package influx
 
 import (
 	"fmt"
+	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"slices"
 	"strings"
 	"time"
@@ -372,8 +373,8 @@ func tenMinutePeriods(minutesPerHour float64, duration time.Duration) int {
 	return int((durationMinutes - leftover) / 10)
 }
 
-var RandomTag bool = true
-var TagNum int = 10
+//var RandomTag bool = true
+//var TagNum int = 10
 
 func (i *IoT) OnlyField1(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
@@ -516,10 +517,10 @@ func (i *IoT) ReadingsPosition(qi query.Query, zipNum int64, latestNum int64, ne
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	influxql = fmt.Sprintf(
@@ -547,10 +548,10 @@ func (i *IoT) ReadingsPosition2(qi query.Query, zipNum int64, latestNum int64, n
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	influxql = fmt.Sprintf(
@@ -578,10 +579,10 @@ func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, new
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("diagnostics")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", common.TagNum)
 	}
 
 	influxql = fmt.Sprintf(
@@ -596,16 +597,16 @@ func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, new
 	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
 }
 
-func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+func (i *IoT) DiagnosticsPredicate(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	var influxql string
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("diagnostics")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", common.TagNum)
 	}
 
 	influxql = fmt.Sprintf(
@@ -615,7 +616,7 @@ func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, new
 	influxql += ";"
 	influxql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64]}#{(fuel_state>0.9[float64])(current_load>4500[int64])}#{empty,empty}", tagString)
 
-	humanLabel := "Influx DiagnosticsLoad Five IoT queries"
+	humanLabel := "Influx DiagnosticsLoad Predicate IoT queries"
 	humanDesc := humanLabel
 	i.fillInQuery(qi, humanLabel, humanDesc, influxql)
 }
@@ -633,10 +634,10 @@ func (i *IoT) ReadingsVelocityAndFuel(qi query.Query, zipNum int64, latestNum in
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	influxql = fmt.Sprintf(
@@ -664,10 +665,10 @@ func (i *IoT) ReadingsVelocityAndFuel2(qi query.Query, zipNum int64, latestNum i
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	influxql = fmt.Sprintf(
@@ -695,10 +696,10 @@ func (i *IoT) ReadingsAvgFuelConsumption(qi query.Query, zipNum int64, latestNum
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	influxql = fmt.Sprintf(
@@ -719,10 +720,10 @@ func (i *IoT) ReadingsVelocityPredicate(qi query.Query, zipNum int64, latestNum 
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	influxql = fmt.Sprintf(
@@ -758,7 +759,7 @@ func (i *IoT) MultiQueries(qi query.Query, zipNum int64, latestNum int64, newOrO
 		i.ReadingsAvgFuelConsumption(qi, zipNum, latestNum, newOrOld)
 		break
 	case 5:
-		i.DiagnosticsFive(qi, zipNum, latestNum, newOrOld)
+		i.DiagnosticsPredicate(qi, zipNum, latestNum, newOrOld)
 		break
 	case 6:
 		i.ReadingsVelocityAndFuel2(qi, zipNum, latestNum, newOrOld)
@@ -791,7 +792,7 @@ func (i *IoT) IoTQueries(qi query.Query, zipNum int64, latestNum int64, newOrOld
 		i.ReadingsAvgFuelConsumption(qi, zipNum, latestNum, newOrOld)
 		break
 	case 5:
-		i.DiagnosticsFive(qi, zipNum, latestNum, newOrOld)
+		i.DiagnosticsPredicate(qi, zipNum, latestNum, newOrOld)
 		break
 	case 6:
 		i.ReadingsVelocityAndFuel2(qi, zipNum, latestNum, newOrOld)

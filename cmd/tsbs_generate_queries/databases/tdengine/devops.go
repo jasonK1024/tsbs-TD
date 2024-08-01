@@ -3,6 +3,7 @@ package tdengine
 import (
 	"fmt"
 	"github.com/taosdata/tsbs/cmd/tsbs_generate_queries/databases"
+	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"slices"
 	"strings"
 	"time"
@@ -217,7 +218,7 @@ func (d *Devops) SimpleCPU(qi query.Query, zipNum int64, latestNum int64, newOrO
 	}
 	sql = fmt.Sprintf(
 		`SELECT _wstart as ts,tbname,avg(usage_nice),avg(usage_steal),avg(usage_guest) FROM cpu WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
-		d.getHostWhereString(TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
+		d.getHostWhereString(common.TagNum), interval.StartUnixMillis(), interval.EndUnixMillis(), duration)
 
 	humanLabel := "TDengine Simple CPU"
 	humanDesc := humanLabel
@@ -235,7 +236,7 @@ func (d *Devops) ThreeField1(qi query.Query, zipNum int64, latestNum int64, newO
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT _wstart as ts,tbname,avg(usage_user),avg(usage_system),avg(usage_idle) FROM cpu WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
@@ -260,7 +261,7 @@ func (d *Devops) ThreeField2(qi query.Query, zipNum int64, latestNum int64, newO
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT _wstart as ts,tbname,avg(usage_idle),avg(usage_nice),avg(usage_iowait) FROM cpu WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
@@ -285,7 +286,7 @@ func (d *Devops) ThreeField3(qi query.Query, zipNum int64, latestNum int64, newO
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT _wstart as ts,tbname,avg(usage_system),avg(usage_idle),avg(usage_nice) FROM cpu WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
@@ -310,7 +311,7 @@ func (d *Devops) FiveField1(qi query.Query, zipNum int64, latestNum int64, newOr
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT _wstart as ts,tbname,avg(usage_user),avg(usage_system),avg(usage_idle),avg(usage_nice),avg(usage_iowait) FROM cpu WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
@@ -335,7 +336,7 @@ func (d *Devops) TenField(qi query.Query, zipNum int64, latestNum int64, newOrOl
 		duration = "60m"
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT _wstart as ts,tbname,avg(usage_user),avg(usage_system),avg(usage_idle),avg(usage_nice),avg(usage_iowait),avg(usage_irq),avg(usage_softirq),avg(usage_steal),avg(usage_guest),avg(usage_guest_nice) FROM cpu WHERE %s AND ts >= %d AND ts < %d  partition by tbname INTERVAL(%s) order by tbname,ts`,
@@ -353,7 +354,7 @@ func (d *Devops) TenFieldWithPredicate(qi query.Query, zipNum int64, latestNum i
 	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	sql := ""
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT _wstart as ts,tbname,usage_user,usage_system,usage_idle,usage_nice,usage_iowait,usage_irq,usage_softirq,usage_steal,usage_guest,usage_guest_nice FROM cpu WHERE %s AND usage_user > 90 AND usage_guest > 90 AND ts >= %d AND ts < %d  partition by tbname order by tbname,ts`,

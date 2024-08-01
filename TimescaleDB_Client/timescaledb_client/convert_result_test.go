@@ -119,3 +119,76 @@ func TestByteArrayToResponseWithDatatype(t *testing.T) {
 	fmt.Println("tag array: ", tagArr)
 
 }
+
+func TestEmptyQuery(t *testing.T) {
+	queryString := `SELECT time as bucket,hostname,usage_user,usage_guest,usage_nice FROM cpu WHERE hostname IN ('host_1','host_45','host_23') AND time >= '2022-01-01 08:00:00 +0000' AND time < '2022-01-01 09:00:00 +0000' AND usage_user > 30 AND usage_guest > 30 ORDER BY hostname,bucket`
+	semanticSegment := `{(cpu.hostname=host_1)(cpu.hostname=host_23)(cpu.hostname=host_45)}#{usage_user[int64],usage_guest[int64],usage_nice[int64]}#{(usage_user>100[int64])(usage_guest>100[int64])}#{empty,empty}`
+
+	host := "192.168.1.101"
+	user := "postgres"
+	pass := "Dell@123"
+	db := "devops_small"
+	port := "5432"
+	driver := pgxDriver
+
+	connectString := fmt.Sprintf("host=%s dbname=%s user=%s port=%s password=%s", host, db, user, port, pass)
+	dbConn, err := sql.Open(driver, connectString)
+	if err != nil {
+		log.Fatal("TimescaleDB connection fail: ", err)
+	}
+
+	rows, err := dbConn.Query(queryString)
+	if err != nil {
+		log.Fatal("Query fail: ", err)
+	}
+	defer rows.Close()
+
+	//fmt.Println(ResultToString(rows))
+
+	col, _ := rows.Columns()
+	colTypes := DataTypeFromColumn(len(col))
+	tags := []string{"hostname=host_1", "hostname=host_23", "hostname=host_45"}
+	sort.Strings(tags)
+	particalSegment, _, metric := SplitPartialSegment(semanticSegment)
+	byteArray, numberOfTable := ResponseToByteArrayWithParams(rows, colTypes, tags, metric, particalSegment)
+
+	var startTime int64 = TimeStringToInt64("2022-01-01 08:00:00 +0000")
+	var endTime int64 = TimeStringToInt64("2022-01-01 09:00:00 +0000")
+	stscacheConn := stscache_client.New("192.168.1.102:11211")
+	err = stscacheConn.Set(&stscache_client.Item{
+		Key:         semanticSegment,
+		Value:       byteArray,
+		Time_start:  startTime,
+		Time_end:    endTime,
+		NumOfTables: numberOfTable,
+	})
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		fmt.Println("SET.")
+		fmt.Printf("bytes set:%d\n", len(byteArray))
+	}
+	startTime = TimeStringToInt64("2022-01-01 08:00:00 +0000")
+	endTime = TimeStringToInt64("2022-01-01 09:00:00 +0000")
+	values, _, err := stscacheConn.Get(semanticSegment, startTime, endTime)
+	if errors.Is(err, stscache_client.ErrCacheMiss) {
+		log.Printf("Key not found in cache")
+	} else if err != nil {
+		log.Fatalf("Error getting value: %v", err)
+	} else {
+		fmt.Println("GET.")
+		fmt.Printf("bytes get:%d\n", len(values))
+	}
+
+	response, flagNum, flagArr, timeRangeArr, tagArr := ByteArrayToResponseWithDatatype(values, colTypes)
+
+	for _, resp := range response {
+		fmt.Println(ResultInterfaceToString(resp, colTypes))
+	}
+
+	fmt.Println("flag num: ", flagNum)
+	fmt.Println("flag array: ", flagArr)
+	fmt.Println("time range array: ", timeRangeArr)
+	fmt.Println("tag array: ", tagArr)
+
+}

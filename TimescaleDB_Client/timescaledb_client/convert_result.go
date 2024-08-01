@@ -241,7 +241,11 @@ func ResponseToByteArrayWithParams(resp *sql.Rows, datatypes []string, tags []st
 
 	respData := RowsToInterface(resp, len(datatypes))
 	if len(respData) == 0 {
-		return nil, 0
+		for _, ss := range singleSegments {
+			emptyByteArray := EmptyResultByteArray(ss)
+			result = append(result, emptyByteArray...)
+		}
+		return result, int64(len(singleSegments))
 	}
 
 	curTag := respData[0][1].(string)
@@ -251,6 +255,19 @@ func ResponseToByteArrayWithParams(resp *sql.Rows, datatypes []string, tags []st
 
 		tag := row[1].(string)
 		if tag != curTag {
+			// 为空表插入数据
+			for segIdx < len(tags) {
+				tidx := strings.Index(tags[segIdx], "=")
+				segTag := tags[segIdx][tidx+1:]
+				if segTag != curTag {
+					emptyByteArray := EmptyResultByteArray(singleSegments[segIdx])
+					result = append(result, emptyByteArray...)
+					segIdx++
+				} else {
+					break
+				}
+			}
+
 			curTag = tag
 			bytesPerSeries, _ := Int64ToByteArray(int64(bytesPerLine * curLines))
 			curLines = 0
@@ -275,6 +292,20 @@ func ResponseToByteArrayWithParams(resp *sql.Rows, datatypes []string, tags []st
 		}
 
 	}
+
+	// 为空表插入数据
+	for segIdx < len(tags) {
+		tidx := strings.Index(tags[segIdx], "=")
+		segTag := tags[segIdx][tidx+1:]
+		if segTag != curTag {
+			emptyByteArray := EmptyResultByteArray(singleSegments[segIdx])
+			result = append(result, emptyByteArray...)
+			segIdx++
+		} else {
+			break
+		}
+	}
+
 	// 最后一张表
 	bytesPerSeries, _ := Int64ToByteArray(int64(bytesPerLine * curLines))
 	result = append(result, []byte(singleSegments[segIdx])...)
@@ -283,25 +314,38 @@ func ResponseToByteArrayWithParams(resp *sql.Rows, datatypes []string, tags []st
 	result = append(result, dataBytes...)
 	segIdx++
 
+	// 为空表插入数据
+	for segIdx < len(tags) {
+		tidx := strings.Index(tags[segIdx], "=")
+		segTag := tags[segIdx][tidx+1:]
+		if segTag != curTag {
+			emptyByteArray := EmptyResultByteArray(singleSegments[segIdx])
+			result = append(result, emptyByteArray...)
+			segIdx++
+		} else {
+			break
+		}
+	}
+
 	return result, int64(segIdx)
 }
 
 func ResponseInterfaceToByteArrayWithParams(respData [][]interface{}, datatypes []string, tags []string, metric string, partialSegment string) ([]byte, int64) {
-	if len(respData) == 0 {
-		return nil, 0
-	}
-
 	var numberOfTable int64 = 0
 	result := make([]byte, 0)
 	dataBytes := make([]byte, 0)
 
 	singleSegments := GetSingleSegment(metric, partialSegment, tags)
 
-	bytesPerLine := BytesPerLine(datatypes)
-
 	if len(respData) == 0 {
-		return nil, 0
+		for _, ss := range singleSegments {
+			emptyByteArray := EmptyResultByteArray(ss)
+			result = append(result, emptyByteArray...)
+		}
+		return result, int64(len(singleSegments))
 	}
+
+	bytesPerLine := BytesPerLine(datatypes)
 
 	//fmt.Println("************", ResultInterfaceToString(respData, datatypes))
 	//fmt.Println("tags: ", tags, singleSegments)
@@ -315,6 +359,19 @@ func ResponseInterfaceToByteArrayWithParams(respData [][]interface{}, datatypes 
 
 		tag := row[1].(string)
 		if tag != curTag {
+			// 为空表插入数据
+			for segIdx < len(tags) {
+				tidx := strings.Index(tags[segIdx], "=")
+				segTag := tags[segIdx][tidx+1:]
+				if segTag != curTag {
+					emptyByteArray := EmptyResultByteArray(singleSegments[segIdx])
+					result = append(result, emptyByteArray...)
+					numberOfTable++
+					segIdx++
+				} else {
+					break
+				}
+			}
 
 			curTag = tag
 			bytesPerSeries, _ := Int64ToByteArray(int64(bytesPerLine * curLines))
@@ -341,6 +398,20 @@ func ResponseInterfaceToByteArrayWithParams(respData [][]interface{}, datatypes 
 		}
 
 	}
+
+	// 为空表插入数据
+	for segIdx < len(tags) {
+		tidx := strings.Index(tags[segIdx], "=")
+		segTag := tags[segIdx][tidx+1:]
+		if segTag != curTag {
+			emptyByteArray := EmptyResultByteArray(singleSegments[segIdx])
+			result = append(result, emptyByteArray...)
+			numberOfTable++
+			segIdx++
+		} else {
+			break
+		}
+	}
 	// 最后一张表
 	bytesPerSeries, _ := Int64ToByteArray(int64(bytesPerLine * curLines))
 	result = append(result, []byte(singleSegments[segIdx])...)
@@ -348,6 +419,21 @@ func ResponseInterfaceToByteArrayWithParams(respData [][]interface{}, datatypes 
 	result = append(result, bytesPerSeries...)
 	result = append(result, dataBytes...)
 	numberOfTable++
+	segIdx++
+
+	// 为空表插入数据
+	for segIdx < len(tags) {
+		tidx := strings.Index(tags[segIdx], "=")
+		segTag := tags[segIdx][tidx+1:]
+		if segTag != curTag {
+			emptyByteArray := EmptyResultByteArray(singleSegments[segIdx])
+			result = append(result, emptyByteArray...)
+			numberOfTable++
+			segIdx++
+		} else {
+			break
+		}
+	}
 
 	return result, numberOfTable
 }

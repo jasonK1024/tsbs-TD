@@ -1,3 +1,52 @@
+
+101启动cache：
+```azure
+启动脚本： 三个参数分别是cache数量，硬盘大小，内存大小
+bash test.sh 1 3135 1045
+ps aux | grep "STsCache" | grep -v "auto" | awk '{print $2}' | sudo xargs kill -9
+/home/dell/project/STsCache/build/bin/STsCache -p 11211 -D /home/dell/project/SSD/ssd1 -m 1045
+```
+
+102生成查询负载：--format: influx/TDengine/timescaledb/questdb
+```azure
+devops：
+./tsbs_generate_queries --seed=123 --timestamp-start="2022-01-01T08:00:00Z" --timestamp-end="2022-12-31T00:00:01Z"  --db-name="devops_small" --use-case="devops" --query-type="cpu-queries" --format="timescaledb" --timescale-use-time-bucket=true --queries=200000 --random-tag=true  --scale=100 --tag-num=10 --ratio="8:1" --file="/home/dell/timescaledb-workloads/cpu_random_small_8:1_200000.txt"
+
+iot:
+./tsbs_generate_queries --seed=123 --timestamp-start="2022-01-01T08:00:00Z" --timestamp-end="2022-12-31T00:00:01Z"  --db-name="iot_small" --use-case="iot" --query-type="iot-queries" --format="timescaledb" --timescale-use-time-bucket=true --queries=200000 --random-tag=true  --scale=100 --tag-num=10 --ratio="8:1" --file="/home/dell/timescaledb-workloads/iot_random_small_8:1_200000.txt"
+
+参数： seed:随机数种子  db-name:数据库名称（[iot/devops]_[small/medium/large]）    use-case:查询样例 iot/devops    query-type:查询类别 iot-queries/cpu-queries
+    format:查询格式（influx/timescaledb/TDengine）   timescale-use-time-bucket：timescaledb的查询格式，没用了   queries：查询数量     random-tag：使用随机的tag，只对influx有效
+    scale：数据集的tag总数（100/300/500）    tag-num:一条查询中的tag数量（10/30/50） 这两个数量可以随意修改，只要不超过数据库实际的tag数量
+    ratio:对新旧时间区间查询的比例（8:1到1:8），可以改成任意比例    file:生成的负载文件
+    
+```
+102运行查询负载：三种数据库需要三个不同的命令(tsbs_run_queries_[influx/tdengine/timescaledb])，对应不同的URL参数
+```azure
+influxdb:
+ ./tsbs_run_queries_influx --urls="http://192.168.1.103:8086" --cache-url="192.168.1.101:11211" --use-cache="stscache" --workers=64 --db-name="devops_small"  --file="/home/dell/influxdb-workloads/devops_random_small_8:1_200000.txt" --print-interval=10000
+
+TDengine:
+ ./tsbs_run_queries_tdengine --host="192.168.1.101"  --workers=64  --use-cache="stscache" --cache-url="192.168.1.101:11211" --db-name="devops_small"  --file="/home/dell/TD-workloads/test_200000.txt" --print-interval=10000
+
+timescaledb:--burn-in：预热查询数量，不计入统计  --max-queries：负载的最大查询数量，必须大于 burn-in
+./tsbs_run_queries_timescaledb --hosts="192.168.1.101" --pass="Dell@123" --workers=64 --db-name="iot_small" --use-cache="stscache" --cache-url="192.168.1.101:11211" --file="/home/dell/timescaledb-workloads/iot_random_small_8:1_200000.txt" --print-interval=10000 --burn-in=20000 --max-queries=200000
+
+参数：
+    预热：--burn-in=20000 --max-queries=200000 ，每个数据库都可以直接用
+    数据库：--urls/--host/--hosts   多数据库用逗号 ',' 连接
+    cache： --use-cache：使用cache或数据库（stscache/db）     --cache-url:cache的URL，多个cache用逗号连接
+    --db-name:使用的数据库的名称（ [iot/devops]_[small/medium/large]）  
+    --workers：客户端线程数量
+    --file:工作负载的路径，分别在 /home/dell/ [ influxdb-workloads / TD-workloads / timescaledb-workloads ] 目录下
+```
+
+用curl查询Quest DB：
+```azure
+curl -G --data-urlencode "query=SELECT timestamp,hostname,avg(usage_user) FROM cpu where hostname IN ('host_1','host_23') AND timestamp >= '2022-01-01T00:00:00.000000Z' AND timestamp < '2022-01-01T01:00:00.000000Z' SAMPLE BY 15m ORDER BY hostname,timestamp;" http://192.168.1.101:9000/exec
+```
+
+
 # Time Series Benchmark Suite (TSBS)
 This repo contains code for benchmarking several time series databases,
 including TimescaleDB, MongoDB, InfluxDB, CrateDB and Cassandra.

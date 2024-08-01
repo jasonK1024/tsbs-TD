@@ -106,11 +106,11 @@ func TestMergeResponseCPU(t *testing.T) {
 }
 
 func TestRemainQueryStringCPU(t *testing.T) {
-	queryString := `SELECT time_bucket('15 minute', time) as bucket,hostname,avg(usage_user),avg(usage_guest),avg(usage_nice) FROM cpu WHERE hostname IN ('host_10','host_45','host_23') AND time >= '2022-01-01 08:00:00 +0000' AND time < '2022-01-01 09:00:00 +0000' GROUP BY hostname,bucket ORDER BY hostname,bucket`
-	semanticSegment := `{(cpu.hostname=host_1)(cpu.hostname=host_23)(cpu.hostname=host_45)}#{usage_user[int64],usage_guest[int64],usage_nice[int64]}#{empty}#{mean,15m}`
+	//queryString := `SELECT time_bucket('15 minute', time) as bucket,hostname,avg(usage_user),avg(usage_guest),avg(usage_nice) FROM cpu WHERE hostname IN ('host_10','host_45','host_23') AND time >= '2022-01-01 08:00:00 +0000' AND time < '2022-01-01 09:00:00 +0000' GROUP BY hostname,bucket ORDER BY hostname,bucket`
+	//semanticSegment := `{(cpu.hostname=host_1)(cpu.hostname=host_23)(cpu.hostname=host_45)}#{usage_user[int64],usage_guest[int64],usage_nice[int64]}#{empty}#{mean,15m}`
 
-	//queryString := `SELECT time as bucket,hostname,usage_user,usage_guest,usage_nice FROM cpu WHERE hostname IN ('host_10','host_45','host_23') AND time >= '2022-01-01 08:00:00 +0000' AND time < '2022-01-01 09:00:00 +0000' AND usage_user > 30 AND usage_guest > 30 ORDER BY hostname,bucket`
-	//semanticSegment := `{(cpu.hostname=host_1)(cpu.hostname=host_23)(cpu.hostname=host_45)}#{usage_user[int64],usage_guest[int64],usage_nice[int64]}#{(usage_user>10[int64])(usage_guest>10[int64])}#{empty,empty}`
+	queryString := `SELECT time as bucket,hostname,usage_user,usage_guest,usage_nice FROM cpu WHERE hostname IN ('host_1','host_45','host_23') AND time >= '2022-01-01 08:00:00 +0000' AND time < '2022-01-01 09:00:00 +0000' AND usage_user > 30 AND usage_guest > 30 ORDER BY hostname,bucket`
+	semanticSegment := `{(cpu.hostname=host_1)(cpu.hostname=host_23)(cpu.hostname=host_45)}#{usage_user[int64],usage_guest[int64],usage_nice[int64]}#{(usage_user>10[int64])(usage_guest>10[int64])}#{empty,empty}`
 
 	host := "192.168.1.101"
 	user := "postgres"
@@ -141,6 +141,8 @@ func TestRemainQueryStringCPU(t *testing.T) {
 
 	var startTime int64 = 1641024000
 	var endTime int64 = 1641027600
+	//var startTime int64 = TimeStringToInt64("2022-01-01 08:00:00 +0000")
+	//var endTime int64 = TimeStringToInt64("2022-01-01 09:00:00 +0000")
 	stscacheConn := stscache_client.New("192.168.1.102:11211")
 	err = stscacheConn.Set(&stscache_client.Item{
 		Key:         semanticSegment,
@@ -185,12 +187,12 @@ func TestRemainQueryStringCPU(t *testing.T) {
 	fmt.Println("remain Start time: ", TimeInt64ToString(remainStartTime))
 	fmt.Println("remain End time: ", TimeInt64ToString(remainEndTime))
 
-	rows, err = dbConn.Query(remainQueryString)
-	if err != nil {
-		log.Fatal("Query fail: ", err)
-	}
-
-	fmt.Println("remain Query result:\n", ResultToString(rows))
+	//rows, err = dbConn.Query(remainQueryString)
+	//if err != nil {
+	//	log.Fatal("Query fail: ", err)
+	//}
+	//
+	//fmt.Println("remain Query result:\n", ResultToString(rows))
 }
 
 func TestRemainQueryStringIoT(t *testing.T) {

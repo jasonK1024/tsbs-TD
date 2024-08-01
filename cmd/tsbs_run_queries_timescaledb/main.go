@@ -17,6 +17,7 @@ import (
 	"github.com/taosdata/tsbs/TimescaleDB_Client/timescaledb_client"
 	"github.com/taosdata/tsbs/internal/utils"
 	"github.com/taosdata/tsbs/pkg/query"
+	"github.com/taosdata/tsbs/pkg/targets/constants"
 	"regexp"
 	"strings"
 	"time"
@@ -63,7 +64,8 @@ func init() {
 	pflag.Bool("show-explain", false, "Print out the EXPLAIN output for sample query")
 	pflag.Bool("force-text-format", false, "Send/receive data in text format")
 
-	pflag.String("db", "", "tdengine or influxdb or timescaledb")
+	//pflag.String("db", "", "tdengine or influxdb or timescaledb")
+	timescaledb_client.DbName = constants.FormatTimescaleDB
 
 	pflag.Parse()
 
@@ -101,7 +103,7 @@ func init() {
 	}
 
 	timescaledb_client.DB = viper.GetString("db-name")
-	timescaledb_client.DbName = viper.GetString("db")
+	//timescaledb_client.DbName = viper.GetString("db")
 
 	runner = query.NewBenchmarkRunner(config)
 

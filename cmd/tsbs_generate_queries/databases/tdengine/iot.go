@@ -2,6 +2,7 @@ package tdengine
 
 import (
 	"fmt"
+	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"slices"
 	"strings"
 	"time"
@@ -247,10 +248,10 @@ func (i *IoT) ReadingsVelocityPredicate(qi query.Query, zipNum int64, latestNum 
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	sql = fmt.Sprintf(
@@ -278,10 +279,10 @@ func (i *IoT) ReadingsPosition(qi query.Query, zipNum int64, latestNum int64, ne
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	sql = fmt.Sprintf(
@@ -309,10 +310,10 @@ func (i *IoT) ReadingsPosition2(qi query.Query, zipNum int64, latestNum int64, n
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	sql = fmt.Sprintf(
@@ -340,10 +341,10 @@ func (i *IoT) ReadingsVelocityAndFuel(qi query.Query, zipNum int64, latestNum in
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	sql = fmt.Sprintf(
@@ -371,10 +372,10 @@ func (i *IoT) ReadingsVelocityAndFuel2(qi query.Query, zipNum int64, latestNum i
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	sql = fmt.Sprintf(
@@ -402,10 +403,10 @@ func (i *IoT) ReadingsAvgFuelConsumption(qi query.Query, zipNum int64, latestNum
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("readings")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 	}
 
 	sql = fmt.Sprintf(
@@ -433,10 +434,10 @@ func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, new
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("diagnostics")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", common.TagNum)
 	}
 
 	sql = fmt.Sprintf(
@@ -464,10 +465,10 @@ func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, new
 
 	truckWhereString := ""
 	tagString := ""
-	if !RandomTag {
+	if !common.RandomTag {
 		truckWhereString, tagString = i.getContinuousTruckWhereStringAndTagString("diagnostics")
 	} else {
-		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+		truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", common.TagNum)
 	}
 
 	sql = fmt.Sprintf(

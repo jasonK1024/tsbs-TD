@@ -2,6 +2,7 @@ package timescaledb
 
 import (
 	"fmt"
+	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"slices"
 	"strings"
 	"time"
@@ -468,7 +469,7 @@ func (i *IoT) ReadingsPosition(qi query.Query, zipNum int64, latestNum int64, ne
 	truckWhereString := ""
 	tagString := ""
 
-	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,name,avg(latitude),avg(longitude),avg(elevation) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
@@ -496,7 +497,7 @@ func (i *IoT) ReadingsPosition2(qi query.Query, zipNum int64, latestNum int64, n
 	truckWhereString := ""
 	tagString := ""
 
-	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,name,avg(latitude),avg(longitude) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
@@ -524,7 +525,7 @@ func (i *IoT) ReadingsVelocityAndFuel(qi query.Query, zipNum int64, latestNum in
 	truckWhereString := ""
 	tagString := ""
 
-	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,name,avg(velocity),avg(fuel_consumption),avg(grade) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
@@ -552,7 +553,7 @@ func (i *IoT) ReadingsVelocityAndFuel2(qi query.Query, zipNum int64, latestNum i
 	truckWhereString := ""
 	tagString := ""
 
-	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,name,avg(velocity),avg(fuel_consumption),avg(grade),avg(heading) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
@@ -580,7 +581,7 @@ func (i *IoT) ReadingsAvgFuelConsumption(qi query.Query, zipNum int64, latestNum
 	truckWhereString := ""
 	tagString := ""
 
-	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,name,avg(velocity),avg(fuel_consumption) FROM readings WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
@@ -608,7 +609,7 @@ func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, new
 	truckWhereString := ""
 	tagString := ""
 
-	truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,name,avg(current_load),avg(fuel_state) FROM diagnostics WHERE %s AND time >= '%s' AND time < '%s' GROUP BY name,bucket ORDER BY name,bucket`,
@@ -622,14 +623,14 @@ func (i *IoT) DiagnosticsLoad(qi query.Query, zipNum int64, latestNum int64, new
 	i.fillInQuery(qi, humanLabel, humanDesc, iot.DiagnosticsTableName, sql)
 }
 
-func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+func (i *IoT) DiagnosticsPredicate(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
 	interval := i.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	sql := ""
 
 	truckWhereString := ""
 	tagString := ""
 
-	truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", TagNum)
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("diagnostics", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time as bucket,name,current_load,fuel_state FROM diagnostics WHERE %s AND time >= '%s' AND time < '%s' AND fuel_state > 0.9 AND current_load > 4500 ORDER BY name,bucket`,
@@ -638,7 +639,7 @@ func (i *IoT) DiagnosticsFive(qi query.Query, zipNum int64, latestNum int64, new
 	sql += ";"
 	sql += fmt.Sprintf("%s#{current_load[float64],fuel_state[float64]}#{(fuel_state>0.9[float64])(current_load>4500[int64])}#{empty,empty}", tagString)
 
-	humanLabel := "TimeScaleDB DiagnosticsLoad Five IoT queries"
+	humanLabel := "TimeScaleDB DiagnosticsLoad Predicate IoT queries"
 	humanDesc := humanLabel
 	i.fillInQuery(qi, humanLabel, humanDesc, iot.DiagnosticsTableName, sql)
 }
@@ -651,7 +652,7 @@ func (i *IoT) ReadingsVelocityPredicate(qi query.Query, zipNum int64, latestNum 
 	truckWhereString := ""
 	tagString := ""
 
-	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", TagNum)
+	truckWhereString, tagString = i.getTruckWhereStringAndTagString("readings", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time as bucket,name,velocity,fuel_consumption,grade FROM readings WHERE %s AND time >= '%s' AND time < '%s' AND velocity > 90 AND fuel_consumption > 40 ORDER BY name,bucket`,
@@ -686,7 +687,7 @@ func (i *IoT) IoTQueries(qi query.Query, zipNum int64, latestNum int64, newOrOld
 		i.ReadingsAvgFuelConsumption(qi, zipNum, latestNum, newOrOld)
 		break
 	case 5:
-		i.DiagnosticsFive(qi, zipNum, latestNum, newOrOld)
+		i.DiagnosticsPredicate(qi, zipNum, latestNum, newOrOld)
 		break
 	case 6:
 		i.ReadingsVelocityAndFuel2(qi, zipNum, latestNum, newOrOld)

@@ -8,6 +8,7 @@ package main
 import (
 	"fmt"
 	influxdb_client "github.com/taosdata/tsbs/InfluxDB-client/v2"
+	"github.com/taosdata/tsbs/pkg/targets/constants"
 	"log"
 	"strings"
 
@@ -41,7 +42,7 @@ func init() {
 
 	pflag.String("urls", "http://localhost:8086", "Daemon URLs, comma-separated. Will be used in a round-robin fashion.")
 	pflag.Uint64("chunk-response-size", 0, "Number of series to chunk results into. 0 means no chunking.")
-	pflag.String("db", "", "tdengine or influxdb")
+	//pflag.String("db", "", "tdengine or influxdb")
 	pflag.Parse()
 
 	err := utils.SetupConfigFile()
@@ -57,7 +58,9 @@ func init() {
 	csvDaemonUrls = viper.GetString("urls")
 	chunkSize = viper.GetUint64("chunk-response-size")
 	influxdb_client.DB = viper.GetString("db-name")
-	influxdb_client.DbName = viper.GetString("db")
+	//influxdb_client.DbName = viper.GetString("db")
+
+	influxdb_client.DbName = constants.FormatInflux
 
 	daemonUrls = strings.Split(csvDaemonUrls, ",")
 	if len(daemonUrls) == 0 {

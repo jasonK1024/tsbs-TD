@@ -3,6 +3,7 @@ package timescaledb
 import (
 	"fmt"
 	"github.com/taosdata/tsbs/cmd/tsbs_generate_queries/databases"
+	"github.com/taosdata/tsbs/pkg/data/usecases/common"
 	"slices"
 	"strings"
 	"time"
@@ -291,12 +292,12 @@ func (d *Devops) ThreeField1(qi query.Query, zipNum int64, latestNum int64, newO
 
 	duration := 0
 	if zipNum < 5 {
-		duration = 5
-	} else {
 		duration = 15
+	} else {
+		duration = 60
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,hostname,avg(usage_user),avg(usage_system),avg(usage_idle) FROM cpu WHERE %s AND time >= '%s' AND time < '%s' GROUP BY hostname,bucket ORDER BY hostname,bucket`,
@@ -316,12 +317,12 @@ func (d *Devops) ThreeField2(qi query.Query, zipNum int64, latestNum int64, newO
 
 	duration := 0
 	if zipNum < 5 {
-		duration = 5
-	} else {
 		duration = 15
+	} else {
+		duration = 60
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,hostname,avg(usage_idle),avg(usage_nice),avg(usage_iowait) FROM cpu WHERE %s AND time >= '%s' AND time < '%s' GROUP BY hostname,bucket ORDER BY hostname,bucket`,
@@ -341,12 +342,12 @@ func (d *Devops) ThreeField3(qi query.Query, zipNum int64, latestNum int64, newO
 
 	duration := 0
 	if zipNum < 5 {
-		duration = 5
-	} else {
 		duration = 15
+	} else {
+		duration = 60
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,hostname,avg(usage_system),avg(usage_idle),avg(usage_nice) FROM cpu WHERE %s AND time >= '%s' AND time < '%s' GROUP BY hostname,bucket ORDER BY hostname,bucket`,
@@ -366,12 +367,12 @@ func (d *Devops) FiveField1(qi query.Query, zipNum int64, latestNum int64, newOr
 
 	duration := 0
 	if zipNum < 5 {
-		duration = 5
-	} else {
 		duration = 15
+	} else {
+		duration = 60
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,hostname,avg(usage_user),avg(usage_system),avg(usage_idle),avg(usage_nice),avg(usage_iowait) FROM cpu WHERE %s AND time >= '%s' AND time < '%s' GROUP BY hostname,bucket ORDER BY hostname,bucket`,
@@ -391,12 +392,12 @@ func (d *Devops) TenField(qi query.Query, zipNum int64, latestNum int64, newOrOl
 
 	duration := 0
 	if zipNum < 5 {
-		duration = 5
-	} else {
 		duration = 15
+	} else {
+		duration = 60
 	}
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time_bucket('%d minute', time) as bucket,hostname,avg(usage_user),avg(usage_system),avg(usage_idle),avg(usage_nice),avg(usage_iowait),avg(usage_irq),avg(usage_softirq),avg(usage_steal),avg(usage_guest),avg(usage_guest_nice) FROM cpu WHERE %s AND time >= '%s' AND time < '%s' GROUP BY hostname,bucket ORDER BY hostname,bucket`,
@@ -414,11 +415,15 @@ func (d *Devops) TenFieldWithPredicate(qi query.Query, zipNum int64, latestNum i
 	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
 	sql := ""
 
-	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", TagNum)
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
 
 	sql = fmt.Sprintf(
 		`SELECT time as bucket,hostname,usage_user,usage_system,usage_idle,usage_nice,usage_iowait,usage_irq,usage_softirq,usage_steal,usage_guest,usage_guest_nice FROM cpu WHERE %s AND time >= '%s' AND time < '%s' AND usage_user > 90 AND usage_guest > 90 ORDER BY hostname,bucket`,
 		hostWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
+
+	//sql = fmt.Sprintf(
+	//	`SELECT time as bucket,hostname,usage_user,usage_system,usage_idle,usage_nice,usage_iowait,usage_irq,usage_softirq,usage_steal,usage_guest,usage_guest_nice FROM cpu WHERE %s AND time >= '%s' AND time < '%s' AND usage_user > 90 ORDER BY hostname,bucket`,
+	//	hostWhereString, interval.Start().Format(goTimeFmt), interval.End().Format(goTimeFmt))
 
 	sql += ";"
 	sql += fmt.Sprintf("%s#{usage_user[int64],usage_system[int64],usage_idle[int64],usage_nice[int64],usage_iowait[int64],usage_irq[int64],usage_softirq[int64],usage_steal[int64],usage_guest[int64],usage_guest_nice[int64]}#{(usage_user>90[int64])(usage_guest>90[int64])}#{empty,empty}", tagString)

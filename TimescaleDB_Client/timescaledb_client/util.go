@@ -76,6 +76,16 @@ func GetQueryTemplate(queryString string) (string, int64, int64, []string) {
 	return result, startTime, endTime, tags
 }
 
+func EmptyResultByteArray(segment string) []byte {
+	emptyValues := make([]byte, 0)
+	zero, _ := Int64ToByteArray(int64(0))
+	emptyValues = append(emptyValues, []byte(segment)...)
+	emptyValues = append(emptyValues, []byte(" ")...)
+	emptyValues = append(emptyValues, zero...)
+
+	return emptyValues
+}
+
 func RowsToInterface(rows *sql.Rows, colLen int) [][]interface{} {
 	if rows == nil {
 		return nil

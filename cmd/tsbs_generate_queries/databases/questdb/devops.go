@@ -2,6 +2,9 @@ package questdb
 
 import (
 	"fmt"
+	"github.com/taosdata/tsbs/cmd/tsbs_generate_queries/databases"
+	"github.com/taosdata/tsbs/pkg/data/usecases/common"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,7 +29,8 @@ type Devops struct {
 // a set of column idents.
 //
 // For instance:
-//      max(cpu_time) AS max_cpu_time
+//
+//	max(cpu_time) AS max_cpu_time
 func (d *Devops) getSelectAggClauses(aggFunc string, idents []string) []string {
 	selectAggClauses := make([]string, len(idents))
 	for i, ident := range idents {
@@ -34,6 +38,31 @@ func (d *Devops) getSelectAggClauses(aggFunc string, idents []string) []string {
 			fmt.Sprintf("%[1]s(%[2]s) AS %[1]s_%[2]s", aggFunc, ident)
 	}
 	return selectAggClauses
+}
+
+func (d *Devops) getHostWhereStringAndTagString(metric string, nHosts int) (string, string) {
+	hostnames, err := d.GetRandomHosts(nHosts)
+	databases.PanicIfErr(err)
+	return d.getHostWhereWithHostnames(hostnames), d.getTagStringWithNames(metric, hostnames)
+}
+
+func (d *Devops) getHostWhereWithHostnames(hostnames []string) string {
+	var hostnameClauses []string
+	for _, s := range hostnames {
+		hostnameClauses = append(hostnameClauses, fmt.Sprintf("'%s'", s))
+	}
+	return fmt.Sprintf("hostname IN (%s)", strings.Join(hostnameClauses, ","))
+}
+
+func (d *Devops) getTagStringWithNames(metric string, names []string) string {
+	tagString := ""
+	tagString += "{"
+	slices.Sort(names)
+	for _, s := range names {
+		tagString += fmt.Sprintf("(%s.hostname=%s)", metric, s)
+	}
+	tagString += "}"
+	return tagString
 }
 
 // MaxAllCPU selects the MAX of all metrics under 'cpu' per hour for N random
@@ -207,4 +236,179 @@ func (d *Devops) GroupByTime(qi query.Query, nHosts, numMetrics int, timeRange t
 		numMetrics, nHosts, timeRange)
 	humanDesc := fmt.Sprintf("%s: %s", humanLabel, interval.StartString())
 	d.fillInQuery(qi, humanLabel, humanDesc, sql)
+}
+
+// New Queries
+func (d *Devops) ThreeField1(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := ""
+	if zipNum < 5 {
+		duration = "15m"
+	} else {
+		duration = "60m"
+	}
+
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT timestamp,hostname,avg(usage_user),avg(usage_system),avg(usage_idle) FROM cpu WHERE %s AND timestamp >= '%s' AND timestamp < '%s' SAMPLE BY %s`,
+		hostWhereString, interval.StartString(), interval.EndString(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{usage_user[int64],usage_system[int64],usage_idle[int64]}#{empty}#{mean,%s}", tagString, duration)
+
+	humanLabel := "QuestDB Three Field 1"
+	humanDesc := humanLabel
+	d.fillInQuery(qi, humanLabel, humanDesc, sql)
+}
+
+func (d *Devops) ThreeField2(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := ""
+	if zipNum < 5 {
+		duration = "15m"
+	} else {
+		duration = "60m"
+	}
+
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT timestamp,hostname,avg(usage_idle),avg(usage_nice),avg(usage_iowait) FROM cpu WHERE %s AND timestamp >= '%s' AND timestamp < '%s' SAMPLE BY %s`,
+		hostWhereString, interval.StartString(), interval.EndString(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{usage_idle[int64],usage_nice[int64],usage_iowait[int64]}#{empty}#{mean,%s}", tagString, duration)
+
+	humanLabel := "QuestDB Three Field 2"
+	humanDesc := humanLabel
+	d.fillInQuery(qi, humanLabel, humanDesc, sql)
+}
+
+func (d *Devops) ThreeField3(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := ""
+	if zipNum < 5 {
+		duration = "15m"
+	} else {
+		duration = "60m"
+	}
+
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT timestamp,hostname,avg(usage_system),avg(usage_idle),avg(usage_nice) FROM cpu WHERE %s AND timestamp >= '%s' AND timestamp < '%s' SAMPLE BY %s`,
+		hostWhereString, interval.StartString(), interval.EndString(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{usage_system[int64],usage_idle[int64],usage_nice[int64]}#{empty}#{mean,%s}", tagString, duration)
+
+	humanLabel := "QuestDB Three Field 3"
+	humanDesc := humanLabel
+	d.fillInQuery(qi, humanLabel, humanDesc, sql)
+}
+
+func (d *Devops) FiveField1(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := ""
+	if zipNum < 5 {
+		duration = "15m"
+	} else {
+		duration = "60m"
+	}
+
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT timestamp,hostname,avg(usage_user),avg(usage_system),avg(usage_idle),avg(usage_nice),avg(usage_iowait) FROM cpu WHERE %s AND timestamp >= '%s' AND timestamp < '%s' SAMPLE BY %s`,
+		hostWhereString, interval.StartString(), interval.EndString(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{usage_user[int64],usage_system[int64],usage_idle[int64],usage_nice[int64],usage_iowait[int64]}#{empty}#{mean,%s}", tagString, duration)
+
+	humanLabel := "QuestDB Five Field 1"
+	humanDesc := humanLabel
+	d.fillInQuery(qi, humanLabel, humanDesc, sql)
+}
+
+func (d *Devops) TenField(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	duration := ""
+	if zipNum < 5 {
+		duration = "15m"
+	} else {
+		duration = "60m"
+	}
+
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT timestamp,hostname,avg(usage_user),avg(usage_system),avg(usage_idle),avg(usage_nice),avg(usage_iowait),avg(usage_irq),avg(usage_softirq),avg(usage_steal),avg(usage_guest),avg(usage_guest_nice) FROM cpu WHERE %s AND timestamp >= '%s' AND timestamp < '%s' SAMPLE BY %s`,
+		hostWhereString, interval.StartString(), interval.EndString(), duration)
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{usage_user[int64],usage_system[int64],usage_idle[int64],usage_nice[int64],usage_iowait[int64],usage_irq[int64],usage_softirq[int64],usage_steal[int64],usage_guest[int64],usage_guest_nice[int64]}#{empty}#{mean,%s}", tagString, duration)
+
+	humanLabel := "QuestDB Ten Field "
+	humanDesc := humanLabel
+	d.fillInQuery(qi, humanLabel, humanDesc, sql)
+}
+
+func (d *Devops) TenFieldWithPredicate(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	interval := d.Interval.DistributionRandWithOldData(zipNum, latestNum, newOrOld)
+	sql := ""
+
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", common.TagNum)
+
+	sql = fmt.Sprintf(
+		`SELECT timestamp,hostname,usage_user,usage_system,usage_idle,usage_nice,usage_iowait,usage_irq,usage_softirq,usage_steal,usage_guest,usage_guest_nice FROM cpu WHERE %s AND timestamp >= '%s' AND timestamp < '%s' AND usage_user > 90 AND usage_guest > 90`,
+		hostWhereString, interval.StartString(), interval.EndString())
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{usage_user[int64],usage_system[int64],usage_idle[int64],usage_nice[int64],usage_iowait[int64],usage_irq[int64],usage_softirq[int64],usage_steal[int64],usage_guest[int64],usage_guest_nice[int64]}#{(usage_user>90[int64])(usage_guest>90[int64])}#{empty,empty}", tagString)
+
+	humanLabel := "QuestDB Ten Field with Predicate"
+	humanDesc := humanLabel
+	d.fillInQuery(qi, humanLabel, humanDesc, sql)
+}
+
+var index = 0
+
+func (d *Devops) CPUQueries(qi query.Query, zipNum int64, latestNum int64, newOrOld int) {
+	switch index % 6 {
+	case 0:
+		d.ThreeField3(qi, zipNum, latestNum, newOrOld)
+		break
+	case 1:
+		d.FiveField1(qi, zipNum, latestNum, newOrOld)
+		break
+	case 2:
+		d.ThreeField1(qi, zipNum, latestNum, newOrOld)
+		break
+	case 3:
+		d.ThreeField2(qi, zipNum, latestNum, newOrOld)
+		break
+	case 4:
+		d.TenField(qi, zipNum, latestNum, newOrOld)
+		break
+	case 5:
+		d.TenFieldWithPredicate(qi, zipNum, latestNum, newOrOld)
+		break
+	default:
+		d.FiveField1(qi, zipNum, latestNum, newOrOld)
+		break
+	}
+
+	//fmt.Printf("number:\t%d\n", index)
+	index++
 }

@@ -12,6 +12,9 @@ import (
 // 新数据和旧数据的比例
 var Ratio []int = []int{8, 1}
 
+var RandomTag bool = true
+var TagNum int = 10
+
 // Generator is a single entity which generates data from its respective measurements.
 type Generator interface {
 	Measurements() []SimulatedMeasurement

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/taosdata/driver-go/v3/wrapper"
 	"github.com/taosdata/tsbs/TDengine_Client/tdengine_client"
+	"github.com/taosdata/tsbs/pkg/targets/constants"
 	"log"
 	"strings"
 	"time"
@@ -42,7 +43,8 @@ func init() {
 	pflag.String("host", "", "TDengine host")
 	pflag.Int("port", 6030, "TDengine Port")
 
-	pflag.String("db", "", "tdengine or influxdb")
+	//pflag.String("db", "", "tdengine or influxdb")
+	tdengine_client.DbName = constants.FormatTDengine
 
 	pflag.Parse()
 	err := utils.SetupConfigFile()
@@ -59,7 +61,7 @@ func init() {
 	port = viper.GetInt("port")
 
 	tdengine_client.DB = viper.GetString("db-name")
-	tdengine_client.DbName = viper.GetString("db")
+	//tdengine_client.DbName = viper.GetString("db")
 
 	// todo	多数据库
 	daemonUrls = strings.Split(host, ",")

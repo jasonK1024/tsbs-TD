@@ -25,6 +25,8 @@ const STRINGBYTELENGTH = 32
 
 var CacheHash = make(map[string]int)
 
+//var MapMutex sync.Mutex
+
 // GetCacheHashValue 根据 fields 选择不同的 cache
 func GetCacheHashValue(fields string) int {
 	CacheNum := len(STsConnArr)
@@ -76,7 +78,10 @@ func STsCacheClientSeg(conn *sql.DB, queryString string, semanticSegment string)
 	// 用于 Set 的语义段
 	starSegment := GetStarSegment(metric, partialSegment)
 
-	CacheIndex := GetCacheHashValue(fields)
+	// 分布式缓存
+	// CacheIndex := GetCacheHashValue(fields)
+
+	CacheIndex := 0
 	fields = "time[int64],name[string]," + fields
 	colLen := strings.Split(fields, ",")
 	datatypes := DataTypeFromColumn(len(colLen))
@@ -196,6 +201,9 @@ func STsCacheClientSeg(conn *sql.DB, queryString string, semanticSegment string)
 				return convertedResponse, byteLength, hitKind
 			}
 
+			//if strings.Contains(remainQueryString, "90") {
+			//	fmt.Println(remainQueryString)
+			//}
 			remainDataArray := RowsToInterface(remainRows, len(datatypes))
 			remainByteArr, numOfTableR := ResponseInterfaceToByteArrayWithParams(remainDataArray, datatypes, remainTags, metric, partialSegment)
 
